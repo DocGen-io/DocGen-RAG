@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+# Haystack 2.0 and components
+haystack-ai
+weaviate-haystack
+sentence-transformers
+# Utils
+gitpython
+pydantic-settings
+pyyaml
+python-multipart
+# Testing
+pytest
+httpx
