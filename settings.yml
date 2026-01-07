@@ -1,0 +1,9 @@
+rag:
+  embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
+  # Threshold for similarity retrieval
+  top_k_retriever: 10
+  top_k_reranker: 5
+  chunk_size: 50 # Flexible chunk size as requested
+
+app:
+  environment: "development"
