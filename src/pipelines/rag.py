@@ -83,7 +83,8 @@ class RAGService:
              # Fallback or error warning
              print("WARNING: No OpenAI API Key found. Generation might fail if using OpenAIGenerator.")
         
-        generator = OpenAIGenerator(api_key=os.getenv("OPENAI_API_KEY"))
+        from haystack.utils import Secret
+        generator = OpenAIGenerator(api_key=Secret.from_token(os.getenv("OPENAI_API_KEY")))
 
         # Connections
         pipeline.add_component("text_embedder", text_embedder)
@@ -98,19 +99,6 @@ class RAGService:
         pipeline.connect("prompt_builder", "generator")
         
         # Run
-        result = pipeline.run({
-            "text_embedder": {"text": query},
-            "prompt_builder": {"query": query} # Reranker also gets query implicitly from retriever if configured? No, reranker needs query usually.
-            # TransformersSimilarityRanker usually needs query. 
-            # Haystack 2.0 TransformersSimilarityRanker signature: run(query: str, documents: List[Document])
-        })
-        
-        # We need to pass query to reranker too explicitly if pipeline doesn't handle it
-        # Actually TransformersSimilarityRanker input is 'query' and 'documents'.
-        # 'retriever' output is 'documents'.
-        # We must feed 'query' to reranker.
-        
-        # Re-run logic with explicit inputs
         result = pipeline.run({
             "text_embedder": {"text": query},
             "reranker": {"query": query},

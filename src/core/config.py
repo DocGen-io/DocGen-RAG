@@ -11,13 +11,13 @@ class Settings:
                 "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
                 "top_k_retriever": 10,
                 "top_k_reranker": 5,
-                "chunk_size": 50
+                "chunk_size": 500
             },
             "app": {
                 "environment": "development"
             },
             # Core/Env vars
-            "WEAVIATE_URL": os.getenv("WEAVIATE_URL", "http://localhost:8080"),
+            "WEAVIATE_URL": os.getenv("WEAVIATE_URL", "http://127.0.0.1:8080"),
             "WEAVIATE_API_KEY": os.getenv("WEAVIATE_API_KEY", None),
             "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY", None)
         }
