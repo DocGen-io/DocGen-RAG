@@ -7,7 +7,7 @@ from haystack.components.embedders import SentenceTransformersDocumentEmbedder, 
 from haystack.components.writers import DocumentWriter
 from haystack.components.retrievers.in_memory import InMemoryEmbeddingRetriever
 from haystack.components.rankers import TransformersSimilarityRanker
-from haystack.components.generators import OpenAIGenerator
+from haystack_integrations.components.generators.google_ai import GoogleAIGeminiGenerator
 from haystack.components.builders import PromptBuilder
 from haystack.document_stores.in_memory import InMemoryDocumentStore
 from haystack.dataclasses import Document
@@ -21,7 +21,21 @@ class RAGService:
         # Initialize Document Store
         # For production/this task, we use Weaviate. 
         # Using embedded URL or user provided URL.
-        self.document_store = WeaviateDocumentStore(url=settings.WEAVIATE_URL, additional_headers={"X-OpenAI-Api-Key": settings.OPENAI_API_KEY} if settings.OPENAI_API_KEY else {})
+        # headers = {}
+
+        # # Add OpenAI if exists
+        # if settings.GOOGLE_API_KEY:
+        # headers["X-OpenAI-Api-Key"] = settings.GOOGLE_API_KEY
+
+        # # Add Google Gemini/AI Studio if exists
+        # if settings.GOOGLE_API_KEY:
+        # headers["X-Goog-Studio-Api-Key"] = settings.GOOGLE_API_KEY
+
+        # self.document_store = WeaviateDocumentStore(
+        # url=settings.WEAVIATE_URL,
+        # additional_headers=headers
+        # )
+        self.document_store = WeaviateDocumentStore(url=settings.WEAVIATE_URL, additional_headers={"X-Goog-Studio-Api-Key": settings.GOOGLE_API_KEY} if settings.GOOGLE_API_KEY else {})
         
         # Models
         self.embedding_model = settings.EMBEDDING_MODEL
@@ -79,12 +93,12 @@ class RAGService:
         prompt_builder = PromptBuilder(template=prompt_template)
         
         # If OpenAI Key is present, use OpenAI, otherwise simple placeholder or user must provide
-        if not settings.OPENAI_API_KEY:
+        if not settings.GOOGLE_API_KEY:
              # Fallback or error warning
-             print("WARNING: No OpenAI API Key found. Generation might fail if using OpenAIGenerator.")
+             print("WARNING: No OpenAI API Key found. Generation might fail if using GoogleAIGeminiGenerator.")
         
         from haystack.utils import Secret
-        generator = OpenAIGenerator(api_key=Secret.from_token(os.getenv("OPENAI_API_KEY")))
+        generator = GoogleAIGeminiGenerator(api_key=Secret.from_token(os.getenv("GOOGLE_API_KEY")))
 
         # Connections
         pipeline.add_component("text_embedder", text_embedder)

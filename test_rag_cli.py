@@ -31,8 +31,8 @@ if __name__ == "__main__":
     load_env()
 
     # Check for crucial keys
-    if not os.getenv("OPENAI_API_KEY"):
-        print("ERROR: OPENAI_API_KEY is not set in environment or .env file.")
+    if not os.getenv("GOOGLE_API_KEY"):
+        print("ERROR: GOOGLE_API_KEY is not set in environment or .env file.")
         print("Please check your .env file.")
         # We allow continuing to see if it gracefully fails or if user uses another provider, 
         # but the request specifically mentioned checking the API key.

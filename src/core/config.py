@@ -19,7 +19,8 @@ class Settings:
             # Core/Env vars
             "WEAVIATE_URL": os.getenv("WEAVIATE_URL", "http://127.0.0.1:8080"),
             "WEAVIATE_API_KEY": os.getenv("WEAVIATE_API_KEY", None),
-            "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY", None)
+            # "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY", None)
+            "GOOGLE_API_KEY": os.getenv("GOOGLE_API_KEY", None)
         }
         self.load_yaml()
 
@@ -54,6 +55,8 @@ class Settings:
     def WEAVIATE_URL(self): return self.config["WEAVIATE_URL"]
     @property
     def OPENAI_API_KEY(self): return self.config["OPENAI_API_KEY"]
+    @property
+    def GOOGLE_API_KEY(self): return self.config["GOOGLE_API_KEY"]
     @property
     def EMBEDDING_MODEL(self): return self.config["rag"]["embedding_model"]
     @property
