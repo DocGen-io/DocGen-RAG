@@ -12,3 +12,6 @@ python-multipart
 # Testing
 pytest
 httpx
+# Tracing
+arize-phoenix
+openinference-instrumentation-haystack
