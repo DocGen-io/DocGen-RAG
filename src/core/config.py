@@ -20,7 +20,9 @@ class Settings:
             "WEAVIATE_URL": os.getenv("WEAVIATE_URL", "http://127.0.0.1:8080"),
             "WEAVIATE_API_KEY": os.getenv("WEAVIATE_API_KEY", None),
             # "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY", None)
-            "GOOGLE_API_KEY": os.getenv("GOOGLE_API_KEY", None)
+            "GOOGLE_API_KEY": os.getenv("GOOGLE_API_KEY", None),
+            "LLM_TYPE": os.getenv("LLM_TYPE", "local"),
+            "PHOENIX_ENABLED": str(os.getenv("PHOENIX_ENABLED", "true")).lower() == "true"
         }
         self.load_yaml()
 
@@ -57,6 +59,10 @@ class Settings:
     def OPENAI_API_KEY(self): return self.config["OPENAI_API_KEY"]
     @property
     def GOOGLE_API_KEY(self): return self.config["GOOGLE_API_KEY"]
+    @property
+    def LLM_TYPE(self): return self.config["LLM_TYPE"]
+    @property
+    def PHOENIX_ENABLED(self): return self.config["PHOENIX_ENABLED"]
     @property
     def EMBEDDING_MODEL(self): return self.config["rag"]["embedding_model"]
     @property
