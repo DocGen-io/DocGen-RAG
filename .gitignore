@@ -1,5 +1,6 @@
-/rag_venv
+/.rag_venv
 /output
 /.vscode
 **/__pycache__
 .env
+data
