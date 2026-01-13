@@ -27,8 +27,8 @@ class LLMFactory:
     def _create_local_generator():
         # Assumes Ollama is running locally
         return OllamaGenerator(
-            model="llama3",
-            url="http://127.0.0.1:11434",
+            model="devstral-small-2:24b",
+            url="http://0.0.0.0:11434",
             generation_kwargs={"num_predict": 500}
         )
 

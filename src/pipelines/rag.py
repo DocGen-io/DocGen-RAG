@@ -1,4 +1,7 @@
 import os
+from src.utils.logging import configure_logging
+
+configure_logging()
 from typing import List, Dict, Optional
 import phoenix as px
 from openinference.instrumentation.haystack import HaystackInstrumentor
@@ -8,8 +11,9 @@ from haystack.components.preprocessors import DocumentSplitter, DocumentCleaner
 from haystack.components.embedders import SentenceTransformersDocumentEmbedder, SentenceTransformersTextEmbedder
 from haystack.components.writers import DocumentWriter
 from haystack.components.retrievers.in_memory import InMemoryEmbeddingRetriever
-from haystack.components.rankers import TransformersSimilarityRanker
+from haystack.components.rankers import SentenceTransformersSimilarityRanker
 from haystack.components.builders import PromptBuilder
+from haystack.utils import ComponentDevice
 from haystack.document_stores.in_memory import InMemoryDocumentStore
 from haystack.dataclasses import Document
 from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
@@ -81,8 +85,11 @@ class RAGService:
         # Components
         text_embedder = SentenceTransformersTextEmbedder(model=self.embedding_model)
         retriever = WeaviateEmbeddingRetriever(document_store=self.document_store, top_k=settings.get("rag.top_k_retriever", 10))
-        reranker = TransformersSimilarityRanker(model=self.reranker_model, top_k=settings.get("rag.top_k_reranker", 5))
-        
+        reranker = SentenceTransformersSimilarityRanker(
+            model="cross-encoder/ms-marco-MiniLM-L-6-v2",
+            top_k=5,
+            device=ComponentDevice.from_str("cuda") 
+        )
         prompt_template = """
         You are an expert API documentation generator.
         Using the following context code snippets, strictly answer the query.
@@ -96,7 +103,7 @@ class RAGService:
         
         Answer:
         """
-        prompt_builder = PromptBuilder(template=prompt_template)
+        prompt_builder = PromptBuilder(template=prompt_template,required_variables=['documents','query'])
         
         # Generator from Factory
         generator = LLMFactory.get_generator(settings.LLM_TYPE)
