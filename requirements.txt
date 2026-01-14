@@ -18,3 +18,7 @@ openinference-instrumentation-haystack
 ollama-haystack
 google-ai-haystack
 accelerate
+
+# Tree-sitter
+tree-sitter==0.21.3
+tree-sitter-languages
