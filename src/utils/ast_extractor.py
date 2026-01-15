@@ -97,9 +97,7 @@ def extract_chunk(node, code_bytes, language, file_name):
             # Check naming convention if no decorator
             if 'View' in chunk['name'] or 'Service' in chunk['name'] or 'Serializer' in chunk['name']:
                 return chunk
-        elif node.type == 'function_definition':
-             if 'login' in chunk['name'] or 'signup' in chunk['name']: # Heuristic for this specific task
-                 return chunk
+
 
     # 4. .NET
     elif file_name.endswith('.cs'):
