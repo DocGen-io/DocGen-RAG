@@ -7,8 +7,10 @@ import phoenix as px
 from openinference.instrumentation.haystack import HaystackInstrumentor
 
 from haystack import Pipeline
-from haystack.components.preprocessors import DocumentSplitter, DocumentCleaner
 from haystack.components.embedders import SentenceTransformersDocumentEmbedder, SentenceTransformersTextEmbedder
+
+from src.components.ASTOutputChunker import ASTOutputChunker
+
 from haystack.components.writers import DocumentWriter
 from haystack.components.retrievers.in_memory import InMemoryEmbeddingRetriever
 from haystack.components.rankers import SentenceTransformersSimilarityRanker
@@ -51,30 +53,27 @@ class RAGService:
         self.embedding_model = settings.EMBEDDING_MODEL
         self.reranker_model = settings.RERANKER_MODEL
 
-    def indexing_pipeline(self, documents: List[Document]):
+    def indexing_pipeline(self, ast_data: List[dict]):
         """
         Creates and runs the indexing pipeline.
         """
         pipeline = Pipeline()
         
         # Components
-        cleaner = DocumentCleaner()
-        splitter = DocumentSplitter(split_by="word", split_length=settings.get("rag.chunk_size", 500), split_overlap=50)
+        splitter = ASTOutputChunker()
         embedder = SentenceTransformersDocumentEmbedder(model=self.embedding_model)
         writer = DocumentWriter(document_store=self.document_store)
         
         # Connections
-        pipeline.add_component("cleaner", cleaner)
         pipeline.add_component("splitter", splitter)
         pipeline.add_component("embedder", embedder)
         pipeline.add_component("writer", writer)
         
-        pipeline.connect("cleaner", "splitter")
         pipeline.connect("splitter", "embedder")
         pipeline.connect("embedder", "writer")
         
         # Run
-        pipeline.run({"cleaner": {"documents": documents}})
+        pipeline.run({"splitter": {"ast_data_list": ast_data}})
 
     def search_and_generate(self, query: str) -> str:
         """
