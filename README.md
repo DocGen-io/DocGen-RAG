@@ -94,3 +94,64 @@ Set the following environment variables (e.g., in a `.env` file or export them):
 - `src/pipelines`: Haystack RAG pipelines for indexing and generation.
 - `src/services`: Core logic for input handling, framework detection, and document generation.
 - `settings.yml`: Configuration file.
+
+## Current RAG System Chart
+```mermaid
+graph TD
+    %%  Input Sources
+    Input1(["Local Codebase Folder"])
+    Input2(["GitHub Repo URL"])
+    
+    %% 2-3. Processing
+    LF[" Language Finder"]
+    FF[" Framework Finder"]
+    
+    %%  Decision Logic
+    RF{"REST Component Finder"}
+    Stop(["Error: Not a REST API"])
+    
+    %%  Vectorization
+    SaveLatest[(" Vectorization Weaviate Storage")]
+    
+    %% 8-9. Documentation Logic
+    CheckDB{" Doc Template exists"}
+    WebSearch[" Web Search Latest API Specs"]
+    VEC[" Weaviate Latest Framework Docs"]
+    
+    %% 10-13. Retrieval and Generation
+    Retriever[" Context Retriever Tenant Isolated"]
+    Rerank[" Reranking and Prompt Augmentation"]
+    LLM[" Final LLM Generation JSON"]
+    HTML[" Static HTML Documentation"]
+
+    %% Connections
+    Input1 --> LF
+    Input2 --> LF
+    LF --> FF
+    FF --> RF
+    
+    RF -- No --> Stop
+    RF -- Yes --> VEC
+    
+    VEC --> CheckDB
+    
+    CheckDB -- No --> WebSearch
+    WebSearch --> SaveLatest
+    SaveLatest --> Retriever
+    
+    CheckDB -- Yes --> Retriever
+    
+    Retriever --> Rerank
+    Rerank --> LLM
+    LLM --> HTML
+
+    %% Styling
+    style Stop fill:#ff0000,stroke:#333
+    style VEC fill:#0000ff,stroke:#333
+    style SaveLatest fill:#0000ff,stroke:#333
+    style RF fill:#301934,stroke:#000
+    style CheckDB fill:#301934,stroke:#d4a017
+    style Input1 fill:#001,stroke:#333
+    style Input2 fill:#001,stroke:#333
+
+```
