@@ -8,6 +8,7 @@ from src.services.framework_detector import FrameworkDetector
 from src.pipelines.rag import RAGService
 from src.services.generator import DocGenerator
 from src.core.config import settings
+from src.utils.ast_extractor import process_directory
 
 app = FastAPI(title="DocGen RAG Service")
 
@@ -47,7 +48,18 @@ def process_documentation(source_type: str, path: str, credentials: Optional[str
         # 3. RAG Pipeline (Knowledge Injection)
         rag = RAGService()
         # rag.learn_framework(framework) # Fetch external docs
-        # rag.indexing_pipeline(...) # Index the codebase - omitted for brevity in this step, requires reading files
+        
+        # Execute AST Extraction and Indexing
+        if working_dir:
+            print(f"Extracting AST from {working_dir}...")
+            # We don't necessarily need to save to disk here, so output_dir=None
+            ast_data = process_directory(working_dir)
+            
+            if ast_data:
+                print(f"Indexing {len(ast_data)} files into RAG...")
+                rag.indexing_pipeline(ast_data)
+            else:
+                print("No suitable files found for AST extraction.")
 
         # 4. Analysis & Generation (Mocked extraction for this step primarily)
         # Real implementation would use RAG to query "List all endpoints", "Get details for X"
