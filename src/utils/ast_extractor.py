@@ -25,7 +25,7 @@ def parse_file(file_path, language_name):
 def get_node_text(node, code_bytes):
     return code_bytes[node.start_byte:node.end_byte].decode('utf8')
 
-def extract_chunk(node, code_bytes, language, file_name):
+def extract_chunk(node, code_bytes, language, file_name, parent_name=None, file_path=None):
     """
     Extracts a chunk if it matches heuristics.
     Returns dict or None.
@@ -42,6 +42,8 @@ def extract_chunk(node, code_bytes, language, file_name):
         "start_line": start_line,
         "end_line": end_line,
         "text": text,
+        "parent_name": parent_name,
+        "filepath": file_path,
         "decorators": []
     }
 
@@ -142,7 +144,7 @@ def process_files():
                 cursor = tree.walk()
                 chunks = []
                 
-                def traverse(curr_node):
+                def traverse(curr_node, parent_name=None):
                     # Python `decorated_definition` wraps `class_definition`
                     # We accept `decorated_definition` and process it, but don't recurse into it 
                     # to generate DOUBLE chunks (one for decorated, one for class).
@@ -157,7 +159,10 @@ def process_files():
                     ]
                     
                     if curr_node.type in relevant_types:
-                        chunk = extract_chunk(curr_node, code_bytes, lang_name, file)
+                        # Calculate relative path
+                        rel_path = os.path.relpath(file_path, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+                        
+                        chunk = extract_chunk(curr_node, code_bytes, lang_name, file, parent_name=parent_name, file_path=rel_path)
                         if chunk:
                             chunks.append(chunk)
                             added = True
@@ -169,8 +174,16 @@ def process_files():
                     # So we DOES want methods.
                     
                     if not added or (curr_node.type in ['class_definition', 'class_declaration']):
+                         # Determine new parent name if this node is a class
+                         new_parent_name = parent_name
+                         if curr_node.type in ['class_definition', 'class_declaration']:
+                             # Try to get the name of this class
+                             name_child = curr_node.child_by_field_name('name')
+                             if name_child:
+                                 new_parent_name = get_node_text(name_child, code_bytes)
+                         
                          for child in curr_node.children:
-                             traverse(child)
+                             traverse(child, parent_name=new_parent_name)
 
                 traverse(tree.root_node)
 
