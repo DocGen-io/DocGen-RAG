@@ -1,15 +1,54 @@
+import sys
 import os
 import json
-from tree_sitter_languages import get_language, get_parser
+from tree_sitter import Language, Parser
+import tree_sitter_python
+import tree_sitter_javascript
+import tree_sitter_typescript
+import tree_sitter_java
+import tree_sitter_c_sharp
+import tree_sitter_php
+import tree_sitter_go
+from src.components.LanguageFinder import LanguageFinder
+from src.services.framework_detector import FrameworkFinder
 
 # Configuration
+# Add project root to sys.path
 APIS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'apis-test')
 AST_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'ast')
 
+def get_language_object(language_name):
+    try:
+        if language_name == 'python':
+            return Language(tree_sitter_python.language())
+        elif language_name == 'javascript':
+            return Language(tree_sitter_javascript.language())
+        elif language_name == 'typescript':
+            return Language(tree_sitter_typescript.language_typescript())
+        elif language_name == 'java':
+            return Language(tree_sitter_java.language())
+        elif language_name == 'c_sharp':
+            # Note: tree-sitter-c-sharp naming might vary, checking standard
+            return Language(tree_sitter_c_sharp.language())
+        elif language_name == 'php':
+             return Language(tree_sitter_php.language_php()) 
+        elif language_name == 'go':
+             return Language(tree_sitter_go.language())
+        elif language_name == 'tsx':
+             return Language(tree_sitter_typescript.language_tsx())
+        else:
+            return None
+    except Exception as e:
+        print(f"Error loading language {language_name}: {e}")
+        return None
+
 def parse_file(file_path, language_name):
     try:
-        language = get_language(language_name)
-        parser = get_parser(language_name)
+        lang = get_language_object(language_name)
+        if not lang:
+            return None, None
+            
+        parser = Parser(lang)
         with open(file_path, 'r', encoding='utf-8') as f:
             code = f.read()
             # Hack for NestJS files with @ts-nocheck to generic parsing
@@ -58,30 +97,30 @@ def extract_chunk(node, code_bytes, language, file_name, parent_name=None, file_
                 chunk['name'] = get_node_text(name_node, code_bytes)
             
             # check decorators (they are usually siblings or part of decorated_definition)
-            # In python tree-sitter, decorators wrap the definition. 
-            # If we are visiting the definition directly, we might miss the wrapper.
-            # We should probably visit `decorated_definition` instead.
             pass
 
-    elif language in ['java', 'c_sharp', 'typescript']:
-        if node.type in ['class_declaration', 'method_declaration', 'class_definition', 'method_definition']:
+    elif language in ['java', 'c_sharp', 'typescript', 'php', 'cpp']:
+         if node.type in ['class_declaration', 'method_declaration', 'class_definition', 'method_definition', 'function_definition']:
              name_node = node.child_by_field_name('name')
              if name_node:
                  chunk['name'] = get_node_text(name_node, code_bytes)
 
-    # FILTERING LOGIC
+    # Note: We rely on the initial FrameworkFinder validation to ensure we are only processing relevant projects.
+    # However, we still need node-level filtering to avoid extracting utilities or non-API code.
+    # This logic can remain locally or eventually be moved to detailed strategies per framework.
+    
+    # Simple Keep-All matching the existing "keep heuristic" logic style for now, 
+    # but could be improved.
+    # For now, we assume if we are here, we are in a valid framework project, but we still filter specific types.
+    
     # 1. NestJS
     if file_name.endswith('.ts'):
-        # Keep Controller classes
         if 'Controller' in text and node.type == 'class_declaration': return chunk
-        # Keep Services
         if 'Service' in chunk['name'] and node.type == 'class_declaration': return chunk
-        # Keep Methods with decorators like @Get, @Post
         if node.type == 'method_definition' and ('@Get' in text or '@Post' in text or '@Put' in text): return chunk
         
     # 2. Spring Boot
     elif file_name.endswith('.java'):
-        # Keep Controllers and Services
         if node.type == 'class_declaration':
             if ('Controller' in text or 'Service' in text): return chunk
         if node.type == 'method_declaration':
@@ -89,128 +128,125 @@ def extract_chunk(node, code_bytes, language, file_name, parent_name=None, file_
 
     # 3. Django / FastAPI (Python)
     elif file_name.endswith('.py'):
-        # Python handling is tricky because `decorated_definition` contains the class/function
-        # We need to handle `decorated_definition` specifically
         if node.type == 'decorated_definition':
-            # Check content
-            if '@' in text: # Has decorator
-                 return chunk
+            if '@' in text: return chunk
         elif node.type == 'class_definition':
-            # Check naming convention if no decorator
             if 'View' in chunk['name'] or 'Service' in chunk['name'] or 'Serializer' in chunk['name']:
                 return chunk
-
 
     # 4. .NET
     elif file_name.endswith('.cs'):
          if node.type == 'class_declaration':
              if 'Controller' in chunk['name'] or 'Service' in chunk['name']: return chunk
          if node.type == 'method_declaration':
-             if '[' in text and ']' in text: # loose check for attributes like [HttpPost]
+             if '[' in text and ']' in text:
                  return chunk
+                 
+    # 5. PHP (Laravel/legacy) - stub for future expansion based on user request "php"
+    elif file_name.endswith('.php'):
+         if 'Controller' in chunk['name']: return chunk
+         
+    # 6. Express (JS/TS) - stub
+    elif file_name.endswith('.js'):
+         if 'app.get' in text or 'app.post' in text: return chunk
 
     return None
 
 def process_directory(input_dir, output_dir=None):
-    extension_map = {
-        '.ts': 'typescript',
-        '.java': 'java',
-        '.py': 'python',
-        '.cs': 'c_sharp'
-    }
-
+    
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
     print(f"Scanning {input_dir}...")
     
+    # 1. Framework Validation
+    framework_finder = FrameworkFinder()
+    detected_framework = framework_finder.detect(input_dir)
+    print(f"Detected Framework: {detected_framework}")
+    
+    if detected_framework == "Unknown":
+        print(f"Error: this code base does not create REST API endpoints -> cannot generate REST API Documentation ..")
+        # In a real tool this might exit(1), but for this script we just return or raise
+        # For the purpose of the requirement "test cases ... to check the output (here it should be an error)"
+        raise ValueError("this code base does not create REST API endpoints -> cannot generate REST API Documentation ..")
+
+    language_finder = LanguageFinder()
     all_ast_data = []
 
     for root, dirs, files in os.walk(input_dir):
+        # exclusions
+        if 'node_modules' in dirs: dirs.remove('node_modules')
+        
         for file in files:
             file_path = os.path.join(root, file)
-            ext = os.path.splitext(file)[1]
             
-            if ext in extension_map:
-                lang_name = extension_map[ext]
+            # 2. Language Detection
+            lang_name = language_finder.detect(file_path)
+            
+            if lang_name != 'unknown':
                 print(f"Processing {file} as {lang_name}...")
                 
-                tree, code = parse_file(file_path, lang_name)
-                if not tree: continue
+                try:
+                    tree, code = parse_file(file_path, lang_name)
+                    if not tree: continue
 
-                code_bytes = bytes(code, 'utf8')
-                
-                # Targeted Traversal
-                # We will walk the tree and specifically look for "Definitions"
-                
-                cursor = tree.walk()
-                chunks = []
-                
-                def traverse(curr_node, parent_name=None):
-                    # Python `decorated_definition` wraps `class_definition`
-                    # We accept `decorated_definition` and process it, but don't recurse into it 
-                    # to generate DOUBLE chunks (one for decorated, one for class).
+                    code_bytes = bytes(code, 'utf8')
                     
-                    added = False
+                    cursor = tree.walk()
+                    chunks = []
                     
-                    # TYPES WE CARE ABOUT
-                    relevant_types = [
-                        'class_definition', 'function_definition', 'decorated_definition', # Python
-                        'class_declaration', 'method_declaration', # Java, C#
-                        'method_definition', # TS
-                    ]
-                    
-                    if curr_node.type in relevant_types:
-                        # Calculate relative path
-                        rel_path = os.path.relpath(file_path, input_dir)
+                    def traverse(curr_node, parent_name=None):
+                        added = False
                         
-                        chunk = extract_chunk(curr_node, code_bytes, lang_name, file, parent_name=parent_name, file_path=rel_path)
-                        if chunk:
-                            chunks.append(chunk)
-                            added = True
-                    
-                    # Only recurse if we didn't add this node as a chunk (to keep it top-level)
-                    # OR if match was a class, we MIGHT want methods inside?
-                    # "reduce the code used more and more" -> implies we might just want the Class High Level?
-                    # But user said "extract functions as controllers functions"
-                    # So we DOES want methods.
-                    
-                    if not added or (curr_node.type in ['class_definition', 'class_declaration']):
-                         # Determine new parent name if this node is a class
-                         new_parent_name = parent_name
-                         if curr_node.type in ['class_definition', 'class_declaration']:
-                             # Try to get the name of this class
-                             name_child = curr_node.child_by_field_name('name')
-                             if name_child:
-                                 new_parent_name = get_node_text(name_child, code_bytes)
-                         
-                         for child in curr_node.children:
-                             traverse(child, parent_name=new_parent_name)
-
-                traverse(tree.root_node)
-
-                if chunks:
-                    final_data = {
-                        "file": file,
-                        "language": lang_name,
-                        "relevant_chunks": chunks
-                    }
-                    all_ast_data.append(final_data)
-
-                    # Save if output_dir is provided
-                    if output_dir:
-                        safe_root = os.path.relpath(root, input_dir).replace(os.sep, '_')
-                        if safe_root == '.' or safe_root == '': safe_root = ""
-                        else: safe_root += "_"
+                        relevant_types = [
+                            'class_definition', 'function_definition', 'decorated_definition', # Python
+                            'class_declaration', 'method_declaration', # Java, C#
+                            'method_definition', # TS
+                            'function_declaration' # Go, PHP?
+                        ]
                         
-                        output_filename = f"{safe_root}{os.path.splitext(file)[0]}.json"
-                        output_path = os.path.join(output_dir, output_filename)
+                        if curr_node.type in relevant_types:
+                            rel_path = os.path.relpath(file_path, input_dir)
+                            chunk = extract_chunk(curr_node, code_bytes, lang_name, file, parent_name=parent_name, file_path=rel_path)
+                            if chunk:
+                                chunks.append(chunk)
+                                added = True
                         
-                        with open(output_path, 'w', encoding='utf-8') as f:
-                            json.dump(final_data, f, indent=2)
-                        print(f"Saved {len(chunks)} chunks to {output_path}")
-                else:
-                    print(f"No relevant chunks found in {file}")
+                        if not added or (curr_node.type in ['class_definition', 'class_declaration']):
+                             new_parent_name = parent_name
+                             if curr_node.type in ['class_definition', 'class_declaration']:
+                                 name_child = curr_node.child_by_field_name('name')
+                                 if name_child:
+                                     new_parent_name = get_node_text(name_child, code_bytes)
+                             
+                             for child in curr_node.children:
+                                 traverse(child, parent_name=new_parent_name)
+
+                    traverse(tree.root_node)
+
+                    if chunks:
+                        final_data = {
+                            "file": file,
+                            "language": lang_name,
+                            "relevant_chunks": chunks
+                        }
+                        all_ast_data.append(final_data)
+
+                        if output_dir:
+                            safe_root = os.path.relpath(root, input_dir).replace(os.sep, '_')
+                            if safe_root == '.' or safe_root == '': safe_root = ""
+                            else: safe_root += "_"
+                            
+                            output_filename = f"{safe_root}{os.path.splitext(file)[0]}.json"
+                            output_path = os.path.join(output_dir, output_filename)
+                            
+                            with open(output_path, 'w', encoding='utf-8') as f:
+                                json.dump(final_data, f, indent=2)
+                            print(f"Saved {len(chunks)} chunks to {output_path}")
+                except Exception as e:
+                   # Parser might assume language lib is present, catch if not
+                   print(f"Skipping {file}: {e}")
+                   continue
 
     return all_ast_data
 
