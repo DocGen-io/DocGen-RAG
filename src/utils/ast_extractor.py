@@ -10,7 +10,7 @@ import tree_sitter_c_sharp
 import tree_sitter_php
 import tree_sitter_go
 from src.components.LanguageFinder import LanguageFinder
-from src.services.framework_detector import FrameworkFinder
+from src.services.framework_detector import FrameworkDetector
 
 # Configuration
 # Add project root to sys.path
@@ -99,13 +99,21 @@ def extract_chunk(node, code_bytes, language, file_name, parent_name=None, file_
             # check decorators (they are usually siblings or part of decorated_definition)
             pass
 
+    if language == 'python' and node.type == 'decorated_definition':
+        # Name is not direct child of decorated_definition, need to look into function_definition or class_definition child
+        definition_node = node.child_by_field_name('definition')
+        if definition_node:
+             name_node = definition_node.child_by_field_name('name')
+             if name_node:
+                 chunk['name'] = get_node_text(name_node, code_bytes)
+
     elif language in ['java', 'c_sharp', 'typescript', 'php', 'cpp']:
          if node.type in ['class_declaration', 'method_declaration', 'class_definition', 'method_definition', 'function_definition']:
              name_node = node.child_by_field_name('name')
              if name_node:
                  chunk['name'] = get_node_text(name_node, code_bytes)
 
-    # Note: We rely on the initial FrameworkFinder validation to ensure we are only processing relevant projects.
+    # Note: We rely on the initial FrameworkDetector validation to ensure we are only processing relevant projects.
     # However, we still need node-level filtering to avoid extracting utilities or non-API code.
     # This logic can remain locally or eventually be moved to detailed strategies per framework.
     
@@ -160,7 +168,7 @@ def process_directory(input_dir, output_dir=None):
     print(f"Scanning {input_dir}...")
     
     # 1. Framework Validation
-    framework_finder = FrameworkFinder()
+    framework_finder = FrameworkDetector()
     detected_framework = framework_finder.detect(input_dir)
     print(f"Detected Framework: {detected_framework}")
     
