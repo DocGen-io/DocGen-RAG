@@ -1,11 +1,11 @@
 import os
 import pytest
-from src.services.framework_detector import FrameworkFinder
+from src.services.framework_detector import FrameworkDetector
 
-class TestFrameworkFinder:
+class TestFrameworkDetector:
     @pytest.fixture
     def finder(self):
-        return FrameworkFinder()
+        return FrameworkDetector()
 
     def test_detect_django(self, tmp_path, finder):
         d = tmp_path / "django_project"
