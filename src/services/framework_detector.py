@@ -68,7 +68,7 @@ class LaravelStrategy(FrameworkStrategy):
     def matches(self, file_content: str, filename: str) -> bool:
         return "Illuminate\\Support\\Facades\\Route" in file_content or "namespace App\\Http\\Controllers" in file_content
 
-class FrameworkFinder:
+class FrameworkDetector:
     """
     Detects the framework used in a project by scanning files and using strategies.
     """
