@@ -17,18 +17,39 @@ class GenerateRequest(BaseModel):
     path: str
     credentials: Optional[str] = None
 
+from typing import Dict, Any
+import uuid
+
+# In-memory job store
+job_store: Dict[str, Dict[str, Any]] = {}
+
 @app.post("/generate")
 async def trigger_generation(request: GenerateRequest, background_tasks: BackgroundTasks):
     """
     Triggers the documentation process in the background.
+    Returns a job_id to track the status.
     """
-    background_tasks.add_task(process_documentation, request.source_type, request.path, request.credentials)
-    return {"status": "Processing started", "message": "Documentation is being generated in the background."}
+    job_id = str(uuid.uuid4())
+    job_store[job_id] = {"status": "processing", "message": "Documentation is being generated."}
+    
+    background_tasks.add_task(process_documentation, request.source_type, request.path, request.credentials, job_id)
+    return {"job_id": job_id, "status": "processing", "message": "Documentation generation started."}
 
-def process_documentation(source_type: str, path: str, credentials: Optional[str]):
-    print(f"Starting processing for {path}")
+@app.get("/status/{job_id}")
+async def get_job_status(job_id: str):
+    """
+    Returns the current status of the documentation generation job.
+    """
+    if job_id not in job_store:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    return job_store[job_id]
+
+def process_documentation(source_type: str, path: str, credentials: Optional[str], job_id: str):
+    print(f"Starting processing for {path} (Job ID: {job_id})")
     input_handler = InputHandler()
     working_dir = None
+    ast_data_folder = 'ast'
     
     try:
         # 1. Input Handling
@@ -37,7 +58,7 @@ def process_documentation(source_type: str, path: str, credentials: Optional[str
         elif source_type == "local":
             working_dir = input_handler.process_local_folder(path)
         else:
-            print("Invalid source type")
+            job_store[job_id] = {"status": "failed", "error": "Invalid source type"}
             return
 
         # 2. Framework Detection
@@ -53,13 +74,20 @@ def process_documentation(source_type: str, path: str, credentials: Optional[str
         if working_dir:
             print(f"Extracting AST from {working_dir}...")
             # We don't necessarily need to save to disk here, so output_dir=None
-            ast_data = process_directory(working_dir)
+            try:
+                ast_data = process_directory(working_dir,ast_data_folder)
+            except Exception as e:
+                print(f"Error extracting AST: {e}")
+                job_store[job_id] = {"status": "failed", "error": str(e)}
+                return
             
             if ast_data:
                 print(f"Indexing {len(ast_data)} files into RAG...")
                 rag.indexing_pipeline(ast_data)
             else:
                 print("No suitable files found for AST extraction.")
+                # Could be a warning or failure depending on strictness
+                # job_store[job_id] = {"status": "completed", "warning": "No files found"}
 
         # 4. Analysis & Generation (Mocked extraction for this step primarily)
         # Real implementation would use RAG to query "List all endpoints", "Get details for X"
@@ -74,9 +102,16 @@ def process_documentation(source_type: str, path: str, credentials: Optional[str
         generator = DocGenerator()
         results = generator.generate_artifacts(extracted_data)
         print(f"Generation complete. Results at: {results}")
+        
+        job_store[job_id] = {
+            "status": "completed", 
+            "message": "Documentation generation successful.",
+            "results": results
+        }
 
     except Exception as e:
         print(f"Error during processing: {e}")
+        job_store[job_id] = {"status": "failed", "error": str(e)}
     finally:
         input_handler.cleanup()
 

@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "docgen-rag"
+version = "0.1.0"
+description = "A RAG-based documentation generator"
+authors = [
+    { name = "Ali Hasan", email = "ali.hasan@docgen.ai" }
+]
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "haystack-ai",
+    "weaviate-haystack",
+    "sentence-transformers",
+    "gitpython",
+    "pydantic-settings",
+    "pyyaml",
+    "python-multipart",
+    "pytest",
+    "httpx",
+    "arize-phoenix",
+    "openinference-instrumentation-haystack",
+    "ollama-haystack",
+    "google-ai-haystack",
+    "accelerate",
+    "tree-sitter",
+    "tree-sitter-python",
+    "tree-sitter-javascript",
+    "tree-sitter-typescript",
+    "tree-sitter-java",
+    "tree-sitter-c-sharp",
+    "tree-sitter-php",
+    "tree-sitter-go",
+    "protobuf<=3.20.0"
+]
+
+
+
+[tool.setuptools]
+packages = {find = {where = ["."]}}
+
+
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

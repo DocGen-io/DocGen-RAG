@@ -31,7 +31,7 @@ DocGen-RAG is an AI-powered tool designed to automatically generate comprehensiv
 
 3.  **Install dependencies**:
     ```bash
-    pip install -r requirements.txt
+    pip install -e .
     ```
 
 ## Configuration
