@@ -3,7 +3,10 @@ import time
 
 if __name__ == "__main__":
     # Launch Phoenix
-    session = px.launch_app(host="0.0.0.0", port=6006)
+    import os
+    os.environ["PHOENIX_HOST"] = "0.0.0.0"
+    os.environ["PHOENIX_PORT"] = "6006"
+    session = px.launch_app()
     print(f"Phoenix UI is running at: {session.url}")
     print("Press Ctrl+C to exit.")
     

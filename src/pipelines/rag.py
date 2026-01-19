@@ -20,6 +20,7 @@ from haystack.document_stores.in_memory import InMemoryDocumentStore
 from haystack.dataclasses import Document
 from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
 from haystack_integrations.components.retrievers.weaviate import WeaviateEmbeddingRetriever
+from phoenix.otel import register
 
 from src.core.config import settings
 from src.pipelines.llm_factory import LLMFactory
@@ -31,8 +32,9 @@ class RAGService:
         # Phoenix Tracing Setup
         if settings.PHOENIX_ENABLED and not RAGService._instrumented:
             try:
-                px.launch_app()
-                HaystackInstrumentor().instrument()
+               
+                tracer_provider = register(endpoint="http://127.0.0.1:6006/v1/traces")
+                HaystackInstrumentor().instrument(tracer_provider=tracer_provider)
                 RAGService._instrumented = True
                 print("Phoenix tracing enabled and instrumented.")
             except Exception as e:
@@ -61,6 +63,8 @@ class RAGService:
         
         # Components
         splitter = ASTOutputChunker()
+
+
         embedder = SentenceTransformersDocumentEmbedder(model=self.embedding_model)
         writer = DocumentWriter(document_store=self.document_store)
         
