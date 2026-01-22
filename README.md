@@ -8,6 +8,7 @@ DocGen-RAG is an AI-powered tool designed to automatically generate comprehensiv
 - **RAG Pipeline**: Uses knowledge injection from framework documentation and codebase indexing.
 - **Multi-Source Support**: Processes both local directories and Git repositories.
 - **Output Formats**: Generates Swagger/OpenAPI JSON, Postman Collections, and usage examples.
+- **Project Management**: Managed with `uv` for fast, reliable dependency management.
 
 ## Prerequisites
 
@@ -31,7 +32,7 @@ DocGen-RAG is an AI-powered tool designed to automatically generate comprehensiv
 
 3.  **Install dependencies**:
     ```bash
-    pip install -e .
+    pip install . --use-feature=in-tree-build
     ```
 
 ## Configuration

@@ -6,3 +6,4 @@
 data
 ast
 docgen_rag.egg-info
+.venv

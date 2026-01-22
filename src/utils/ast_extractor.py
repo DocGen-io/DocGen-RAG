@@ -6,13 +6,11 @@ from tree_sitter_language_pack import get_language
 from src.components.LanguageFinder import LanguageFinder
 from src.services.framework_detector import FrameworkDetector
 
-# Configuration
-# Add project root to sys.path
-APIS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'apis-test')
-AST_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'ast')
 
 def get_language_object(language_name):
     return get_language(language_name)
+
+
 def parse_file(file_path, language_name):
     try:
         lang = get_language_object(language_name)
@@ -228,6 +226,10 @@ def process_directory(input_dir, output_dir=None):
                    continue
 
     return all_ast_data
+
+# Configuration
+APIS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'apis-test')
+AST_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'ast')
 
 if __name__ == "__main__":
     process_directory(APIS_DIR, AST_DIR)
