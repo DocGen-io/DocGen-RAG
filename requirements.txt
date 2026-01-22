@@ -21,12 +21,6 @@ accelerate
 
 # Tree-sitter
 tree-sitter
-tree-sitter-python
-tree-sitter-javascript
-tree-sitter-typescript
-tree-sitter-java
-tree-sitter-c-sharp
-tree-sitter-php
-tree-sitter-go
-
+# tree-sitter-languages-pack instead of installing individual languages
+tree-sitter-language-pack
 -e .

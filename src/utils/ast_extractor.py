@@ -2,13 +2,7 @@ import sys
 import os
 import json
 from tree_sitter import Language, Parser
-import tree_sitter_python
-import tree_sitter_javascript
-import tree_sitter_typescript
-import tree_sitter_java
-import tree_sitter_c_sharp
-import tree_sitter_php
-import tree_sitter_go
+from tree_sitter_language_pack import get_language
 from src.components.LanguageFinder import LanguageFinder
 from src.services.framework_detector import FrameworkDetector
 
@@ -18,30 +12,7 @@ APIS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__
 AST_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'ast')
 
 def get_language_object(language_name):
-    try:
-        if language_name == 'python':
-            return Language(tree_sitter_python.language())
-        elif language_name == 'javascript':
-            return Language(tree_sitter_javascript.language())
-        elif language_name == 'typescript':
-            return Language(tree_sitter_typescript.language_typescript())
-        elif language_name == 'java':
-            return Language(tree_sitter_java.language())
-        elif language_name == 'c_sharp':
-            # Note: tree-sitter-c-sharp naming might vary, checking standard
-            return Language(tree_sitter_c_sharp.language())
-        elif language_name == 'php':
-             return Language(tree_sitter_php.language_php()) 
-        elif language_name == 'go':
-             return Language(tree_sitter_go.language())
-        elif language_name == 'tsx':
-             return Language(tree_sitter_typescript.language_tsx())
-        else:
-            return None
-    except Exception as e:
-        print(f"Error loading language {language_name}: {e}")
-        return None
-
+    return get_language(language_name)
 def parse_file(file_path, language_name):
     try:
         lang = get_language_object(language_name)
