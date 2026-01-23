@@ -1,0 +1,66 @@
+import os
+from typing import List, Dict, Any
+from tree_sitter import QueryCursor
+
+from .base_extractor import BaseASTExtractor
+
+QUERIES_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)),
+    'extractor', 'queries'
+)
+
+class TypeScriptASTExtractor(BaseASTExtractor):
+    def __init__(self):
+        super().__init__('typescript')
+
+    def extract(self, file_path: str) -> List[Dict[str, Any]]:
+        query_path = os.path.join(QUERIES_DIR, 'controllers', 'typescript.scm')
+        query = self._load_query(query_path)
+        if not query: return []
+
+        tree, code_bytes = self.parse_file(file_path)
+        if not tree or not code_bytes: return []
+
+        cursor = QueryCursor(query)
+        matches = cursor.matches(tree.root_node)
+        
+        results = []
+        current_class = None
+
+        for _, captures in matches:
+            if "class_name" in captures:
+                c_node = captures["class_node"][0]
+                decorator = self._get_capture_text(captures, "class_decorator_name", code_bytes)
+                
+                current_class = {
+                    "class_name": self._get_capture_text(captures, "class_name", code_bytes),
+                    "class_type": decorator if decorator else "Utility",
+                    "base_path": self._get_capture_text(captures, "class_decorator_path", code_bytes, "/"),
+                    "methods": [],
+                    "_start": c_node.start_byte,
+                    "_end": c_node.end_byte
+                }
+                results.append(current_class)
+
+            elif "method_name" in captures and current_class:
+                m_def = captures["method_definition"][0]
+                if not (m_def.start_byte >= current_class["_start"] and m_def.end_byte <= current_class["_end"]):
+                    continue
+
+                m_decorator = self._get_capture_text(captures, "method_decorator_name", code_bytes)
+                is_api = m_decorator in ["Get", "Post", "Put", "Delete", "Patch", "Options", "Head", "All", "MessagePattern"]
+                
+                method_data = {
+                    "method_name": self._get_capture_text(captures, "method_name", code_bytes),
+                    "method_type": m_decorator if is_api else None,
+                    "is_api_route": is_api,
+                    "method_path": self._get_capture_text(captures, "method_decorator_path", code_bytes) if is_api else None,
+                    "method_definition": self._get_text(m_def, code_bytes)
+                }
+                current_class["methods"].append(method_data)
+
+        for c in results:
+            c.pop("_start", None)
+            c.pop("_end", None)
+
+        return [c for c in results if c["methods"]]
