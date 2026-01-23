@@ -7,6 +7,7 @@ from src.services.framework_detector import FrameworkDetector
 
 from .java_extractor import JavaASTExtractor
 from .typescript_extractor import TypeScriptASTExtractor
+from .python_extractor import PythonASTExtractor
 
 class ASTExtractor:
     """
@@ -17,6 +18,7 @@ class ASTExtractor:
         self._extractors = {
             'java': JavaASTExtractor(),
             'typescript': TypeScriptASTExtractor(),
+            'python': PythonASTExtractor(),
         }
 
     def extract_by_query(self, file_path: str, query_type: str = 'controllers') -> List[Dict[str, Any]]:
@@ -72,6 +74,10 @@ def main():
     SPRINGBOOT_DIR = os.path.join(APIS_TEST_DIR, 'springboot')
     if os.path.exists(SPRINGBOOT_DIR):
          process_directory(SPRINGBOOT_DIR, AST_DIR)
+
+    DJANGO_DIR = os.path.join(APIS_TEST_DIR, 'django')
+    if os.path.exists(DJANGO_DIR):
+         process_directory(DJANGO_DIR, AST_DIR)
 
 if __name__ == "__main__":
     main()
