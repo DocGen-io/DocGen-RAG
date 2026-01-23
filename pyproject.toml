@@ -32,6 +32,9 @@ dependencies = [
     "tree-sitter-language-pack"
 ]
 
+[project.scripts]
+ast-extractor = "src.components.extractor.ast_extractor:main"
+
 
 
 [tool.setuptools]
