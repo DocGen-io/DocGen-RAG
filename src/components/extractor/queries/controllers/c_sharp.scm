@@ -1,22 +1,22 @@
-; C# Controller Query
+; C# Controller and Service Query
 (compilation_unit
-  (using_directive) @import_statement
-
   (namespace_declaration
     (declaration_list
       (class_declaration
         (attribute_list
           (attribute
-            name: (identifier) @attr_name
+            name: (identifier) @class_attr
             (attribute_argument_list
               (attribute_argument
                 (string_literal) @base_path
               )
             )?
-            (#eq? @attr_name "Route")
           )
-        )
+        )*
         name: (identifier) @class_name
+        (base_list
+             (identifier) @superclass
+        )?
         body: (declaration_list
           (method_declaration
             (attribute_list
@@ -28,7 +28,7 @@
                   )
                 )?
               )
-            )
+            )*
             name: (identifier) @method_name
           ) @method_definition
         )
