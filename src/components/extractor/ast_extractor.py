@@ -8,6 +8,7 @@ from src.services.framework_detector import FrameworkDetector
 from .java_extractor import JavaASTExtractor
 from .typescript_extractor import TypeScriptASTExtractor
 from .python_extractor import PythonASTExtractor
+from .csharp_extractor import CSharpASTExtractor
 
 class ASTExtractor:
     """
@@ -19,10 +20,12 @@ class ASTExtractor:
             'java': JavaASTExtractor(),
             'typescript': TypeScriptASTExtractor(),
             'python': PythonASTExtractor(),
+            'c_sharp': CSharpASTExtractor(),
         }
 
     def extract_by_query(self, file_path: str, query_type: str = 'controllers') -> List[Dict[str, Any]]:
         language = self._language_finder.detect(file_path)
+
         if language == 'unknown':
             return []
         
@@ -78,6 +81,10 @@ def main():
     DJANGO_DIR = os.path.join(APIS_TEST_DIR, 'django')
     if os.path.exists(DJANGO_DIR):
          process_directory(DJANGO_DIR, AST_DIR)
+
+    DOTNET_DIR = os.path.join(APIS_TEST_DIR, 'dotnet')
+    if os.path.exists(DOTNET_DIR):
+         process_directory(DOTNET_DIR, AST_DIR)
 
 if __name__ == "__main__":
     main()
