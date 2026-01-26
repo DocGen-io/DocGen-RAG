@@ -63,4 +63,5 @@ class TypeScriptASTExtractor(BaseASTExtractor):
             c.pop("_start", None)
             c.pop("_end", None)
 
-        return [c for c in results if c["methods"]]
+        self.handle_extractor_output(results,file_path)
+        return [c for c in results if c["methods"]] 

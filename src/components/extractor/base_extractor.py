@@ -3,6 +3,10 @@ from typing import Tuple, Optional, List, Dict, Any, Union
 import os
 from tree_sitter import Language, Parser, Tree, Query
 from tree_sitter_language_pack import get_language
+import yaml
+import json
+
+
 
 class BaseASTExtractor(ABC):
     """
@@ -66,6 +70,28 @@ class BaseASTExtractor(ABC):
             return text[1:-1]
         return text
 
+    def handle_extractor_output(self, chunks: List[Dict[str, Any]],file_path:str) -> List[Dict[str, Any]]:
+        # read from config.yaml
+
+        with open('config.yaml', 'r') as f:
+            config = yaml.safe_load(f)
+
+        if config['verbose']:
+            print(json.dumps(chunks, indent=2))
+        
+        if config['save_ast']:
+            # create directory if not exists
+            file_path = file_path.split('/')[-1] + '.json'
+
+            if(not os.path.exists(config['save_ast_path'])):
+                os.makedirs(config['save_ast_path'])
+
+            with open(config['save_ast_path'] + "/" + file_path, 'w') as f:
+                json.dump(chunks, f, indent=2)
+                
+            print(f"Saved AST to {config['save_ast_path'] + '/' + file_path}")
+        return chunks
+    
     @abstractmethod
     def extract(self, file_path: str) -> List[Dict[str, Any]]:
         pass

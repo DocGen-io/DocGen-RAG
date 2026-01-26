@@ -1,0 +1,29 @@
+# config.yaml
+
+# RAG settings
+rag:
+  embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
+  top_k_retriever: 10
+  top_k_reranker: 5
+  chunk_size: 500
+
+# App settings
+app:
+  environment: "development"
+
+# Environment variables
+WEAVIATE_URL: "http://127.0.0.1:8080"
+WEAVIATE_API_KEY: null
+OPENAI_API_KEY: null
+GOOGLE_API_KEY: null
+LLM_TYPE: "local"
+PHOENIX_ENABLED: true
+
+# AST Extractor settings
+verbose: true
+save_ast: true
+save_ast_path: "ast" # folder name where AST will be saved
+
+# Framework settings
+frameworks: ["springboot", "django", "dotnet"]
+
