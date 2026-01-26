@@ -78,7 +78,7 @@ def process_documentation(source_type: str, path: str, credentials: Optional[str
                 ast_data = process_directory(working_dir,ast_data_folder)
             except Exception as e:
                 print(f"Error extracting AST: {e}")
-                job_store[job_id] = {"status": "failed", "error": str(e)}
+                job_store[job_id] = {"status": "failed", "error: THIS IS TEST": str(e)}
                 return
             
             if ast_data:
