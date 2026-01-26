@@ -7,6 +7,21 @@ rag:
   top_k_reranker: 5
   chunk_size: 500
 
+# code mapper settings
+
+
+code_mapper:
+  active_generator: "ollama"
+  generators:
+    ollama:
+      url: "http://127.0.0.1:11434"
+      api_key: ""
+      model: "llama3"
+    gemini:
+      url: "https://generativelanguage.googleapis.com/v1beta/"
+      api_key: ""
+      model: "gemini-2.5-flash"
+
 # App settings
 app:
   environment: "development"
