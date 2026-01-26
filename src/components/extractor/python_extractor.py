@@ -102,4 +102,5 @@ class PythonASTExtractor(BaseASTExtractor):
         # Filter only classes with methods? Java extractor did.
         # But maybe we want empty classes too? sticking to Java behavior
         results = list(class_map.values())
+        self.handle_extractor_output(results,file_path)
         return [c for c in results if c["methods"]]

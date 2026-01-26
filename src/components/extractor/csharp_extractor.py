@@ -102,6 +102,7 @@ class CSharpASTExtractor(BaseASTExtractor):
                 }
 
                 class_map[class_name]["methods"].append(method_data)
-
+        
         results = list(class_map.values())
+        self.handle_extractor_output(results, file_path)
         return [c for c in results if c["methods"]]

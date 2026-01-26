@@ -81,5 +81,7 @@ class JavaASTExtractor(BaseASTExtractor):
                 }
                 
                 class_map[class_name]["methods"].append(method_data)
+        results = list(class_map.values())
 
-        return list(class_map.values())
+        self.handle_extractor_output(results, file_path)
+        return results

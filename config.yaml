@@ -1,0 +1,44 @@
+# config.yaml
+
+# RAG settings
+rag:
+  embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
+  top_k_retriever: 10
+  top_k_reranker: 5
+  chunk_size: 500
+
+# code mapper settings
+
+
+code_mapper:
+  active_generator: "ollama"
+  generators:
+    ollama:
+      url: "http://127.0.0.1:11434"
+      api_key: ""
+      model: "llama3"
+    gemini:
+      url: "https://generativelanguage.googleapis.com/v1beta/"
+      api_key: ""
+      model: "gemini-2.5-flash"
+
+# App settings
+app:
+  environment: "development"
+
+# Environment variables
+WEAVIATE_URL: "http://127.0.0.1:8080"
+WEAVIATE_API_KEY: null
+OPENAI_API_KEY: null
+GOOGLE_API_KEY: null
+LLM_TYPE: "local"
+PHOENIX_ENABLED: true
+
+# AST Extractor settings
+verbose: true
+save_ast: true
+save_ast_path: "ast" # folder name where AST will be saved
+
+# Framework settings
+frameworks: ["springboot", "django", "dotnet"]
+

@@ -102,6 +102,10 @@ class FrameworkDetector:
 
             for file in files:
                 file_path = os.path.join(root, file)
+                print(file_path)
+                if os.path.isdir(file_path):
+                   return  self.detect(file_path)
+
                 
                 # Skip large files or binaries
                 try:
