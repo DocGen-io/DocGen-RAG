@@ -5,10 +5,15 @@ import uvicorn
 
 from src.services.input_handler import InputHandler
 from src.services.framework_detector import FrameworkDetector
-from src.pipelines.rag import RAGService
+# from src.pipelines.rag import RAGService
 from src.services.generator import DocGenerator
 from src.core.config import settings
-from src.utils.ast_extractor import process_directory
+# from src.utils.ast_extractor import process_directory
+from src.components.extractor.ast_extractor import ASTExtractor
+from src.components.CodeMapper import CodeMapper
+import yaml
+import os
+import json
 
 app = FastAPI(title="DocGen RAG Service")
 
@@ -49,7 +54,10 @@ def process_documentation(source_type: str, path: str, credentials: Optional[str
     print(f"Starting processing for {path} (Job ID: {job_id})")
     input_handler = InputHandler()
     working_dir = None
-    ast_data_folder = 'ast'
+    
+    # Load config
+    with open("config.yaml", "r") as f:
+        config = yaml.safe_load(f)
     
     try:
         # 1. Input Handling
@@ -61,52 +69,56 @@ def process_documentation(source_type: str, path: str, credentials: Optional[str
             job_store[job_id] = {"status": "failed", "error": "Invalid source type"}
             return
 
-        # 2. Framework Detection
-        detector = FrameworkDetector()
-        framework = detector.detect(working_dir)
-        print(f"Detected Framework: {framework}")
+        if not working_dir:
+             job_store[job_id] = {"status": "failed", "error": "Could not determine working directory"}
+             return
 
-        # 3. RAG Pipeline (Knowledge Injection)
-        rag = RAGService()
-        # rag.learn_framework(framework) # Fetch external docs
-        
-        # Execute AST Extraction and Indexing
-        if working_dir:
-            print(f"Extracting AST from {working_dir}...")
-            # We don't necessarily need to save to disk here, so output_dir=None
-            try:
-                ast_data = process_directory(working_dir,ast_data_folder)
-            except Exception as e:
-                print(f"Error extracting AST: {e}")
-                job_store[job_id] = {"status": "failed", "error: THIS IS TEST": str(e)}
-                return
+        # 2. AST Extraction
+        print(f"Extracting AST from {working_dir}...")
+        extractor = ASTExtractor()
+        all_ast_data = []
+
+        # Walk through directory
+        for root, dirs, files in os.walk(working_dir):
+            # Ignore common exclude dirs
+            if 'node_modules' in dirs: dirs.remove('node_modules')
+            if '.git' in dirs: dirs.remove('.git')
+            if '__pycache__' in dirs: dirs.remove('__pycache__')
+            if '.venv' in dirs: dirs.remove('.venv')
             
-            if ast_data:
-                print(f"Indexing {len(ast_data)} files into RAG...")
-                rag.indexing_pipeline(ast_data)
-            else:
-                print("No suitable files found for AST extraction.")
-                # Could be a warning or failure depending on strictness
-                # job_store[job_id] = {"status": "completed", "warning": "No files found"}
+            for file in files:
+                file_path = os.path.join(root, file)
+                try:
+                    chunks = extractor.extract_by_query(file_path)
+                    if chunks:
+                        all_ast_data.extend(chunks)
+                except Exception as e:
+                     print(f"Error extracting from {file}: {e}")
 
-        # 4. Analysis & Generation (Mocked extraction for this step primarily)
-        # Real implementation would use RAG to query "List all endpoints", "Get details for X"
+        if not all_ast_data:
+            print("No suitable files found for AST extraction.")
+            job_store[job_id] = {"status": "completed", "warning": "No AST data found"}
+            return
+
+        # 3. Code Mapping
+        print(f"Mapping {len(all_ast_data)} AST chunks...")
+        mapper = CodeMapper()
+        mapped_data = mapper.run(all_ast_data)
+
+        # 4. Save Output
+        # output_file = "mapped_ast.json" 
+        # Or use a config value if available, e.g. config.get('mapper_output_path', 'mapped_ast.json')
+        output_file = config.get('mapper_output_path', 'mapped_ast.json')
         
-        # Mocking extracted data for demonstration of the flow
-        extracted_data = [
-            {"path": "/users/{id}", "method": "GET", "description": "Get user by ID", "example_response": {"id": 1, "name": "Alice"}},
-            {"path": "/login", "method": "POST", "description": "User login", "example_request": {"username": "u", "password": "p"}}
-        ]
-        
-        # 5. Output Generation
-        generator = DocGenerator()
-        results = generator.generate_artifacts(extracted_data)
-        print(f"Generation complete. Results at: {results}")
+        with open(output_file, "w") as f:
+            json.dump(mapped_data, f, indent=2)
+            
+        print(f"Mapping complete. Results saved to {output_file}")
         
         job_store[job_id] = {
             "status": "completed", 
             "message": "Documentation generation successful.",
-            "results": results
+            "results_file": output_file
         }
 
     except Exception as e:
@@ -114,6 +126,7 @@ def process_documentation(source_type: str, path: str, credentials: Optional[str
         job_store[job_id] = {"status": "failed", "error": str(e)}
     finally:
         input_handler.cleanup()
+          
 
 if __name__ == "__main__":
     uvicorn.run("src.api.main:app", host="0.0.0.0", port=8000, reload=True)
