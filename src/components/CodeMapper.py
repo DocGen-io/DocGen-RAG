@@ -3,10 +3,58 @@ from typing import List
 from src.utils.modelGenerator import ModelGenerator 
 import json
 import logging
+import re
 from string import Template
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+
+def repair_json(json_string: str) -> str:
+    """
+    Attempt to repair common JSON issues from LLM output.
+    - Removes markdown code blocks
+    - Balances brackets and braces
+    """
+    # Remove markdown code blocks if present
+    json_string = re.sub(r'^```json\s*', '', json_string.strip())
+    json_string = re.sub(r'^```\s*', '', json_string)
+    json_string = re.sub(r'\s*```$', '', json_string)
+    json_string = json_string.strip()
+    
+    # Count unbalanced brackets
+    open_braces = json_string.count('{')
+    close_braces = json_string.count('}')
+    open_brackets = json_string.count('[')
+    close_brackets = json_string.count(']')
+    
+    # Add missing closing brackets/braces
+    json_string += ']' * (open_brackets - close_brackets)
+    json_string += '}' * (open_braces - close_braces)
+    
+    return json_string
+
+
+def safe_parse_json(response: str, max_retries: int = 0, generator=None, prompt: str = None) -> dict:
+    """
+    Safely parse JSON from LLM response with repair and retry logic.
+    """
+    # First, try to repair and parse
+    repaired = repair_json(response)
+    try:
+        return json.loads(repaired)
+    except json.JSONDecodeError as e:
+        logger.warning(f"JSON parse failed after repair: {e}")
+        
+        # If we have retry capability, try again
+        if max_retries > 0 and generator and prompt:
+            logger.info(f"Retrying LLM call, {max_retries} attempts remaining...")
+            new_response = generator.run(prompt)['replies'][0]
+            return safe_parse_json(new_response, max_retries - 1, generator, prompt)
+        
+        # Last resort: return empty structure
+        logger.error(f"Could not parse JSON: {response[:200]}...")
+        raise
 
 @component
 class CodeMapper:
@@ -39,6 +87,7 @@ class CodeMapper:
         3. **Internal Context**: If a method is called on `this` or `self`, include it.
         4. **Strict Output**: Return ONLY a raw JSON object. 
         5. **No Markdown**: Do not wrap the output in ```json blocks. Do not include any conversational text, explanations, or notes.
+        6. **JUST JSON FROMAT WITHOUT ANY TEXT**
 
         ### SCHEMA EXAMPLE
         Input:
@@ -49,15 +98,16 @@ class CodeMapper:
             ]
         }
 
-        Output:
-        {
+        ### Output:
+        
+            {
             "methods": [
                 {
                     "method": "login",
                     "dependencies": ["authService.verify"]
                 }
             ]
-        }
+            }
 
         ### DATA TO ANALYZE
         $query_data
@@ -67,10 +117,11 @@ class CodeMapper:
         try:
 
             output = {}
-            query = ""
             start_time = datetime.now()
 
             for ast_data in ast_data_list:
+                query = ""
+
                 query+=f"className: {ast_data['class_name']}\n"
                 
                 logger.info("Mapping data for class: ", ast_data['class_name'])
@@ -82,10 +133,19 @@ class CodeMapper:
                 query+=f"methods: {defenitions}\n"
 
                 # run the generator and get the first generated response
-                response = self.generator.run(prompt_template.substitute(query_data=query))['replies'][0]
+                full_prompt = prompt_template.substitute(query_data=query)
+                response = self.generator.run(full_prompt)['replies'][0]
 
-                # parse the response to json
-                json_output = json.loads(response)
+                # parse the response to json with repair and retry logic
+                print("**" * 50)
+                print(response)
+                json_output = safe_parse_json(
+                    response, 
+                    max_retries=2, 
+                    generator=self.generator, 
+                    prompt=full_prompt
+                )
+                print("**" * 50)
 
                 output[ast_data['class_name']] = json_output
             
