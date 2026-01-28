@@ -137,15 +137,12 @@ class CodeMapper:
                 response = self.generator.run(full_prompt)['replies'][0]
 
                 # parse the response to json with repair and retry logic
-                print("**" * 50)
-                print(response)
                 json_output = safe_parse_json(
                     response, 
                     max_retries=2, 
                     generator=self.generator, 
                     prompt=full_prompt
                 )
-                print("**" * 50)
 
                 output[ast_data['class_name']] = json_output
             
