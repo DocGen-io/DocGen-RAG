@@ -26,6 +26,7 @@ class TypeScriptASTExtractor(BaseASTExtractor):
         
         results = []
         current_class = None
+        seen_methods = set()  # Track method byte ranges to avoid duplicates
 
         for _, captures in matches:
             if "class_name" in captures:
@@ -42,10 +43,15 @@ class TypeScriptASTExtractor(BaseASTExtractor):
                 }
                 results.append(current_class)
 
+            # Handle regular method_definition WITH decorator
             elif "method_name" in captures and current_class:
                 m_def = captures["method_definition"][0]
+                method_key = (m_def.start_byte, m_def.end_byte)
+                if method_key in seen_methods:
+                    continue
                 if not (m_def.start_byte >= current_class["_start"] and m_def.end_byte <= current_class["_end"]):
                     continue
+                seen_methods.add(method_key)
 
                 m_decorator = self._get_capture_text(captures, "method_decorator_name", code_bytes)
                 is_api = m_decorator in ["Get", "Post", "Put", "Delete", "Patch", "Options", "Head", "All", "MessagePattern"]
@@ -59,9 +65,70 @@ class TypeScriptASTExtractor(BaseASTExtractor):
                 }
                 current_class["methods"].append(method_data)
 
+            # Handle regular method_definition WITHOUT decorator
+            elif "plain_method_name" in captures and current_class:
+                m_def = captures["plain_method_definition"][0]
+                method_key = (m_def.start_byte, m_def.end_byte)
+                if method_key in seen_methods:
+                    continue
+                if not (m_def.start_byte >= current_class["_start"] and m_def.end_byte <= current_class["_end"]):
+                    continue
+                seen_methods.add(method_key)
+                
+                method_data = {
+                    "method_name": self._get_capture_text(captures, "plain_method_name", code_bytes),
+                    "method_type": None,
+                    "is_api_route": False,
+                    "method_path": None,
+                    "method_definition": self._get_text(m_def, code_bytes)
+                }
+                current_class["methods"].append(method_data)
+
+            # Handle arrow function method WITH decorator
+            elif "arrow_method_name" in captures and current_class:
+                m_def = captures["arrow_method_definition"][0]
+                method_key = (m_def.start_byte, m_def.end_byte)
+                if method_key in seen_methods:
+                    continue
+                if not (m_def.start_byte >= current_class["_start"] and m_def.end_byte <= current_class["_end"]):
+                    continue
+                seen_methods.add(method_key)
+
+                m_decorator = self._get_capture_text(captures, "arrow_method_decorator_name", code_bytes)
+                is_api = m_decorator in ["Get", "Post", "Put", "Delete", "Patch", "Options", "Head", "All", "MessagePattern"]
+                
+                method_data = {
+                    "method_name": self._get_capture_text(captures, "arrow_method_name", code_bytes),
+                    "method_type": m_decorator if is_api else None,
+                    "is_api_route": is_api,
+                    "method_path": self._get_capture_text(captures, "arrow_method_decorator_path", code_bytes) if is_api else None,
+                    "method_definition": self._get_text(m_def, code_bytes)
+                }
+                current_class["methods"].append(method_data)
+
+            # Handle arrow function method WITHOUT decorator
+            elif "plain_arrow_method_name" in captures and current_class:
+                m_def = captures["plain_arrow_method_definition"][0]
+                method_key = (m_def.start_byte, m_def.end_byte)
+                if method_key in seen_methods:
+                    continue
+                if not (m_def.start_byte >= current_class["_start"] and m_def.end_byte <= current_class["_end"]):
+                    continue
+                seen_methods.add(method_key)
+                
+                method_data = {
+                    "method_name": self._get_capture_text(captures, "plain_arrow_method_name", code_bytes),
+                    "method_type": None,
+                    "is_api_route": False,
+                    "method_path": None,
+                    "method_definition": self._get_text(m_def, code_bytes)
+                }
+                current_class["methods"].append(method_data)
+
         for c in results:
             c.pop("_start", None)
             c.pop("_end", None)
 
         self.handle_extractor_output(results,file_path)
-        return [c for c in results if c["methods"]] 
+        return [c for c in results if c["methods"]]
+ 

@@ -25,7 +25,6 @@ class ASTExtractor:
 
     def extract_by_query(self, file_path: str) -> List[Dict[str, Any]]:
         language = self._language_finder.detect(file_path)
-        print(language)
         if language == 'unknown':
             return []
         

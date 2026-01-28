@@ -86,6 +86,9 @@ class BaseASTExtractor(ABC):
             if(not os.path.exists(config['save_ast_path'])):
                 os.makedirs(config['save_ast_path'])
 
+            if not chunks:
+                print(f"No chunks found for {file_path}")
+                return []
             with open(config['save_ast_path'] + "/" + file_path, 'w') as f:
                 json.dump(chunks, f, indent=2)
                 
