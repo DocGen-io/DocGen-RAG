@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Tuple, Optional, List, Dict, Any, Union
 import os
+import re
 from tree_sitter import Language, Parser, Tree, Query
 from tree_sitter_language_pack import get_language
 import yaml
@@ -70,31 +71,70 @@ class BaseASTExtractor(ABC):
             return text[1:-1]
         return text
 
-    def handle_extractor_output(self, chunks: List[Dict[str, Any]],file_path:str) -> List[Dict[str, Any]]:
-        # read from config.yaml
+    def _trim_code(self, code: str) -> str:
+        """
+        Trim extra newlines from code body.
+        Removes excessive consecutive newlines (3+) and trims whitespace.
+        """
+        if not code:
+            return code
+        # Replace multiple consecutive newlines with a single newline
+        cleaned = re.sub(r'\n{3,}', '\n\n', code)
+        # Remove leading/trailing whitespace
+        return cleaned.strip()
 
+    def _enrich_chunks(self, chunks: List[Dict[str, Any]], file_name: str) -> List[Dict[str, Any]]:
+        """
+        Enrich chunks by adding file_name to each class and class_name to each method.
+        Also trims excessive newlines from method_definition.
+        """
+        for class_info in chunks:
+            class_name = class_info.get('class_name', 'Unknown')
+            # Add file_name to class level
+            class_info['file_name'] = file_name
+            
+            methods = class_info.get('methods', [])
+            for method in methods:
+                # Add class_name to each method
+                method['class_name'] = class_name
+                # Add file_name to each method
+                method['file_name'] = file_name
+                # Trim extra newlines from method_definition
+                if 'method_definition' in method:
+                    method['method_definition'] = self._trim_code(method['method_definition'])
+        
+        return chunks
+
+    def handle_extractor_output(self, chunks: List[Dict[str, Any]], file_path: str) -> List[Dict[str, Any]]:
+        # read from config.yaml
         with open('config.yaml', 'r') as f:
             config = yaml.safe_load(f)
+
+        # Extract file name from path
+        file_name = file_path.split('/')[-1] + '.json'
+        
+        # Enrich chunks with file_name and class_name, and trim newlines
+        chunks = self._enrich_chunks(chunks, file_name)
 
         if config['verbose']:
             print(json.dumps(chunks, indent=2))
         
         if config['save_ast']:
             # create directory if not exists
-            file_path = file_path.split('/')[-1] + '.json'
-
-            if(not os.path.exists(config['save_ast_path'])):
+            if not os.path.exists(config['save_ast_path']):
                 os.makedirs(config['save_ast_path'])
 
             if not chunks:
-                print(f"No chunks found for {file_path}")
+                print(f"No chunks found for {file_name}")
                 return []
-            with open(config['save_ast_path'] + "/" + file_path, 'w') as f:
+            
+            with open(config['save_ast_path'] + "/" + file_name, 'w') as f:
                 json.dump(chunks, f, indent=2)
                 
-            print(f"Saved AST to {config['save_ast_path'] + '/' + file_path}")
+            print(f"Saved AST to {config['save_ast_path'] + '/' + file_name}")
         return chunks
     
     @abstractmethod
     def extract(self, file_path: str) -> List[Dict[str, Any]]:
         pass
+
