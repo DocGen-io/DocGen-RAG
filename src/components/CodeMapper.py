@@ -1,60 +1,13 @@
 from haystack import component, Document
 from typing import List
-from src.utils.modelGenerator import ModelGenerator 
-import json
+from src.utils.modelGenerator import ModelGenerator
+from src.utils.llm_json_handler import LLMJsonHandler
 import logging
-import re
 from string import Template
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-
-def repair_json(json_string: str) -> str:
-    """
-    Attempt to repair common JSON issues from LLM output.
-    - Removes markdown code blocks
-    - Balances brackets and braces
-    """
-    # Remove markdown code blocks if present
-    json_string = re.sub(r'^```json\s*', '', json_string.strip())
-    json_string = re.sub(r'^```\s*', '', json_string)
-    json_string = re.sub(r'\s*```$', '', json_string)
-    json_string = json_string.strip()
-    
-    # Count unbalanced brackets
-    open_braces = json_string.count('{')
-    close_braces = json_string.count('}')
-    open_brackets = json_string.count('[')
-    close_brackets = json_string.count(']')
-    
-    # Add missing closing brackets/braces
-    json_string += ']' * (open_brackets - close_brackets)
-    json_string += '}' * (open_braces - close_braces)
-    
-    return json_string
-
-
-def safe_parse_json(response: str, max_retries: int = 0, generator=None, prompt: str = None) -> dict:
-    """
-    Safely parse JSON from LLM response with repair and retry logic.
-    """
-    # First, try to repair and parse
-    repaired = repair_json(response)
-    try:
-        return json.loads(repaired)
-    except json.JSONDecodeError as e:
-        logger.warning(f"JSON parse failed after repair: {e}")
-        
-        # If we have retry capability, try again
-        if max_retries > 0 and generator and prompt:
-            logger.info(f"Retrying LLM call, {max_retries} attempts remaining...")
-            new_response = generator.run(prompt)['replies'][0]
-            return safe_parse_json(new_response, max_retries - 1, generator, prompt)
-        
-        # Last resort: return empty structure
-        logger.error(f"Could not parse JSON: {response[:200]}...")
-        raise
 
 @component
 class CodeMapper:
@@ -137,11 +90,11 @@ class CodeMapper:
                 response = self.generator.run(full_prompt)['replies'][0]
 
                 # parse the response to json with repair and retry logic
-                json_output = safe_parse_json(
+                json_output = LLMJsonHandler.parse_with_retry(
                     response, 
-                    max_retries=2, 
                     generator=self.generator, 
-                    prompt=full_prompt
+                    prompt=full_prompt,
+                    max_retries=2
                 )
 
                 output[ast_data['class_name']] = json_output
