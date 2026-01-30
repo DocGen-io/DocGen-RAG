@@ -22,6 +22,20 @@ code_mapper:
       api_key: ""
       model: "gemini-2.5-flash"
 
+# Documentation Creator settings
+doc_creator:
+  active_generator: "ollama"
+  generators:
+    ollama:
+      url: "http://127.0.0.1:11434"
+      api_key: ""
+      model: "llama3:latest"
+    gemini:
+      url: "https://generativelanguage.googleapis.com/v1beta/"
+      api_key: ""
+      model: "gemini-2.5-flash"
+  output_dir: "output"
+
 # App settings
 app:
   environment: "development"
