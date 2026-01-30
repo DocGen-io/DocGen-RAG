@@ -78,10 +78,14 @@ class CodeMapper:
                 query+=f"className: {ast_data['class_name']}\n"
                 
                 logger.info("Mapping data for class: ", ast_data['class_name'])
-                # add method defenitions to the query
+                
+                # Build lookup for is_api_route per method
+                api_route_lookup = {}
                 defenitions = []
                 for method in ast_data['methods']:
                     defenitions.append(method['method_definition'])
+                    method_name = method.get('method_name', '')
+                    api_route_lookup[method_name] = method.get('is_api_route', False)
                 
                 query+=f"methods: {defenitions}\n"
 
@@ -96,6 +100,11 @@ class CodeMapper:
                     prompt=full_prompt,
                     max_retries=2
                 )
+
+                # Merge is_api_route into each method's output
+                for method_info in json_output.get('methods', []):
+                    method_name = method_info.get('method', '')
+                    method_info['is_api_route'] = api_route_lookup.get(method_name, False)
 
                 output[ast_data['class_name']] = json_output
             
