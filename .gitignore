@@ -7,3 +7,8 @@ data
 ast
 docgen_rag.egg-info
 .venv
+mapped_ast.json
+
+
+.ignore
+.agent

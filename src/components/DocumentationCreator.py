@@ -14,7 +14,7 @@ import logging
 from string import Template
 
 from src.utils.modelGenerator import ModelGenerator
-from src.utils.json_loader import load_json_folder, load_json_file, flatten_ast_methods
+from src.utils.json_loader import load_json_folder, load_json_file
 from src.utils.weaviate_utils import fetch_by_method_name
 from src.utils.llm_json_handler import LLMJsonHandler
 
@@ -93,11 +93,18 @@ class DocumentationCreator:
             logger.warning(f"Could not load config: {e}")
             return {}
     
-    def _get_api_methods(self, ast_data: List[Dict]) -> List[Dict]:
-        """Filter methods where is_api_route=true from flattened AST data."""
-        all_methods = flatten_ast_methods(ast_data)
-        api_methods = [m for m in all_methods if m.get("is_api_route") is True]
-        logger.info(f"Found {len(api_methods)} API methods out of {len(all_methods)} total")
+    def _get_api_methods(self, mapped_ast: Dict) -> List[Dict]:
+        """Filter methods where is_api_route=true from mapped_ast."""
+        api_methods = []
+        for class_name, class_data in mapped_ast.items():
+            for method_info in class_data.get("methods", []):
+                if method_info.get("is_api_route") is True:
+                    api_methods.append({
+                        "class_name": class_name,
+                        "method_name": method_info.get("method"),
+                        "dependencies": method_info.get("dependencies", [])
+                    })
+        logger.info(f"Found {len(api_methods)} API methods in mapped_ast")
         return api_methods
     
     def _get_dependencies_for_method(
@@ -241,26 +248,44 @@ class DocumentationCreator:
     def run(
         self,
         mapped_ast_path: str,
-        ast_folder: str
+        ast_folder: str = None
     ) -> Dict[str, Any]:
         """
-        Process AST files and generate API documentation.
+        Process mapped AST and generate API documentation.
         
         Args:
             mapped_ast_path: Path to mapped_ast.json file
-            ast_folder: Path to folder containing AST JSON files
+            ast_folder: Optional, path to AST folder (used for additional context)
             
         Returns:
             Dictionary with processing results
         """
-        logger.info(f"Starting DocumentationCreator: ast_folder={ast_folder}, mapped_ast={mapped_ast_path}")
+        logger.info(f"Starting DocumentationCreator: mapped_ast={mapped_ast_path}")
         
-        # Load data using existing utilities
-        ast_data = load_json_folder(ast_folder)
+        # Load mapped_ast
         mapped_ast = load_json_file(mapped_ast_path) or {}
         
-        # Get API methods only
-        api_methods = self._get_api_methods(ast_data)
+        # Load AST data for additional context (method definitions, paths, etc.)
+        ast_data = load_json_folder(ast_folder) if ast_folder else []
+        
+        # Build lookup for method details from AST
+        method_details = {}
+        for ast_file in ast_data:
+            for file_data in ast_file.get("data", [ast_file]):
+                for cls in (file_data if isinstance(file_data, list) else [file_data]):
+                    class_name = cls.get("class_name", "")
+                    base_path = cls.get("base_path", "/")
+                    for method in cls.get("methods", []):
+                        key = f"{class_name}.{method.get('method_name')}"
+                        method_details[key] = {
+                            "method_definition": method.get("method_definition", ""),
+                            "method_type": method.get("method_type", "GET"),
+                            "method_path": method.get("method_path", ""),
+                            "base_path": base_path
+                        }
+        
+        # Get API methods from mapped_ast
+        api_methods = self._get_api_methods(mapped_ast)
         
         if not api_methods:
             logger.warning("No API methods found to document")
@@ -281,8 +306,13 @@ class DocumentationCreator:
             logger.info(f"Processing: {class_name}.{method_name}")
             
             try:
-                # Get dependencies from mapped_ast
-                dependencies = self._get_dependencies_for_method(class_name, method_name, mapped_ast)
+                # Get dependencies already included in method from _get_api_methods
+                dependencies = method.get("dependencies", [])
+                
+                # Enrich method with details from AST
+                key = f"{class_name}.{method_name}"
+                if key in method_details:
+                    method.update(method_details[key])
                 
                 # Fetch dependency context from Weaviate
                 dep_context = self._fetch_dependency_context(dependencies)
