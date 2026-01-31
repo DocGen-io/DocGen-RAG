@@ -14,9 +14,11 @@ import logging
 from string import Template
 
 from src.utils.modelGenerator import ModelGenerator
-from src.utils.json_loader import load_json_folder, load_json_file
+from src.utils.json_loader import load_json_file
 from src.utils.weaviate_utils import fetch_by_method_name
 from src.utils.llm_json_handler import LLMJsonHandler
+from src.utils.config_loader import load_config
+from src.utils.folder_scanners import ASTFolderScanner
 
 logger = logging.getLogger(__name__)
 
@@ -78,20 +80,11 @@ class DocumentationCreator:
         config_path: str = "config.yaml"
     ):
         self.generator = ModelGenerator("doc_creator", config_path).get_generator()
-        self.config = self._load_config(config_path)
+        self.config = load_config(config_path)
         self.output_dir = self.config.get("doc_creator", {}).get("output_dir", "output")
         
         # Initialize Weaviate document store
         self.document_store = WeaviateDocumentStore(url=weaviate_url)
-    
-    def _load_config(self, path: str) -> Dict[str, Any]:
-        import yaml
-        try:
-            with open(path, "r") as f:
-                return yaml.safe_load(f)
-        except Exception as e:
-            logger.warning(f"Could not load config: {e}")
-            return {}
     
     def _get_api_methods(self, mapped_ast: Dict) -> List[Dict]:
         """Filter methods where is_api_route=true from mapped_ast."""
@@ -266,7 +259,7 @@ class DocumentationCreator:
         mapped_ast = load_json_file(mapped_ast_path) or {}
         
         # Load AST data for additional context (method definitions, paths, etc.)
-        ast_data = load_json_folder(ast_folder) if ast_folder else []
+        ast_data = ASTFolderScanner().scan(ast_folder) if ast_folder else []
         
         # Build lookup for method details from AST
         method_details = {}
