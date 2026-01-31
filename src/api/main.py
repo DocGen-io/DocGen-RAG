@@ -76,9 +76,9 @@ def process_documentation(source_type: str, path: str, credentials: Optional[str
         # 2. AST Extraction
         print(f"Extracting AST from {working_dir}...")
         extractor = ASTExtractor()
-        all_ast_data = []
-
-        # Walk through directory
+        
+        # Collect all file paths
+        file_paths = []
         for root, dirs, files in os.walk(working_dir):
             # Ignore common exclude dirs
             if 'node_modules' in dirs: dirs.remove('node_modules')
@@ -87,13 +87,12 @@ def process_documentation(source_type: str, path: str, credentials: Optional[str
             if '.venv' in dirs: dirs.remove('.venv')
             
             for file in files:
-                file_path = os.path.join(root, file)
-                try:
-                    chunks = extractor.extract_by_query(file_path)
-                    if chunks:
-                        all_ast_data.extend(chunks)
-                except Exception as e:
-                     print(f"Error extracting from {file}: {e}")
+                file_paths.append(os.path.join(root, file))
+        
+        # Extract AST using component
+        result = extractor.run(file_paths=file_paths)
+        all_ast_data = result["ast_data"]
+        print(f"Processed {result['files_processed']} files, {result['files_failed']} failed")
 
         if not all_ast_data:
             print("No suitable files found for AST extraction.")
