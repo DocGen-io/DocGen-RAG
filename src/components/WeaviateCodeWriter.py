@@ -15,7 +15,8 @@ from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
 from typing import List, Dict, Any, Optional
 import logging
 
-from src.utils.json_loader import load_json_folder, load_json_file, flatten_ast_methods
+from src.utils.json_loader import load_json_file, flatten_ast_methods
+from src.utils.folder_scanners import ASTFolderScanner
 
 logger = logging.getLogger(__name__)
 
@@ -160,8 +161,8 @@ class WeaviateCodeWriter:
         """
         logger.info(f"Starting WeaviateCodeWriter with ast_folder={ast_folder}, mapped_ast_path={mapped_ast_path}")
         
-        # Load data using shared utility
-        ast_files = load_json_folder(ast_folder)
+        # Load data using folder scanner
+        ast_files = ASTFolderScanner().scan(ast_folder)
         mapped_ast = load_json_file(mapped_ast_path) or {}
         
         # Process to documents
