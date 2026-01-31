@@ -36,6 +36,13 @@ doc_creator:
       model: "gemini-2.5-flash"
   output_dir: "output"
 
+# Documentation Merger settings
+doc_merger:
+  api_title: "API Documentation"
+  api_version: "1.0.0"
+  api_description: "Auto-generated REST API documentation"
+  base_url: "http://localhost:3000"
+
 # App settings
 app:
   environment: "development"
