@@ -1,12 +1,23 @@
 import os
-from typing import Optional, Dict, Any
+from typing import Optional
 from haystack.components.generators import OpenAIGenerator
 from haystack_integrations.components.generators.ollama import OllamaGenerator
 from haystack_integrations.components.generators.google_ai import GoogleAIGeminiGenerator
 from haystack.utils import Secret
-from src.core.config import settings
+from src.utils.config_loader import load_config
+
 
 class LLMFactory:
+    """Factory for creating LLM generators based on config."""
+    
+    _config = None
+    
+    @classmethod
+    def _get_config(cls):
+        if cls._config is None:
+            cls._config = load_config()
+        return cls._config
+    
     @staticmethod
     def get_generator(llm_type: str = "local"):
         """
@@ -34,22 +45,21 @@ class LLMFactory:
 
     @staticmethod
     def _create_google_generator():
-        if not settings.GOOGLE_API_KEY:
-            raise ValueError("GOOGLE_API_KEY is not set in configuration.")
+        config = LLMFactory._get_config()
+        api_key = config.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            raise ValueError("GOOGLE_API_KEY is not set in config.yaml or environment.")
         return GoogleAIGeminiGenerator(
             model="gemini-pro",
-            api_key=Secret.from_token(settings.GOOGLE_API_KEY)
+            api_key=Secret.from_token(api_key)
         )
 
     @staticmethod
     def _create_openai_generator():
-        # Assumes OPENAI_API_KEY is set in env or settings
-        # config.py doesn't fully expose OPENAI_API_KEY property yet in the snippet I saw, 
-        # but the class had it commented or present. 
-        # I'll use os.getenv as fallback or assume the user handles it.
-        api_key = os.getenv("OPENAI_API_KEY")
+        config = LLMFactory._get_config()
+        api_key = config.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
         if not api_key:
-             raise ValueError("OPENAI_API_KEY is not set.")
+            raise ValueError("OPENAI_API_KEY is not set in config.yaml or environment.")
         return OpenAIGenerator(
             model="gpt-3.5-turbo",
             api_key=Secret.from_token(api_key)
