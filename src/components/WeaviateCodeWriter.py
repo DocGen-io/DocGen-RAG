@@ -92,6 +92,8 @@ class WeaviateCodeWriter:
                 content=content,
                 meta={
                     'type': 'ast_method',
+                    'dependencies': [],
+                    'dependency_count': 0,
                     **method  # Include all fields from the method
                 }
             )
@@ -130,6 +132,8 @@ class WeaviateCodeWriter:
                         'type': 'code_mapper',
                         'class_name': class_name,
                         'method_name': method_name,
+                        'method_definition': "",   # Default empty
+                        'file_name': "",           # Default empty
                         'dependencies': dependencies,
                         'dependency_count': len(dependencies)
                     }
@@ -146,28 +150,45 @@ class WeaviateCodeWriter:
     )
     def run(
         self,
-        ast_folder: str,
-        mapped_ast_path: str
+        ast_folder: str = "ast",
+        mapped_ast_path: str = "mapped_ast.json",
+        ast_data: Optional[List[Dict[str, Any]]] = None,
+        mapped_ast: Optional[Dict[str, Any]] = None
     ) -> Dict[str, int]:
         """
-        Process AST files and mapped_ast.json and write to Weaviate.
+        Process AST and mapped_ast and write to Weaviate.
         
         Args:
-            ast_folder: Path to folder containing AST JSON files
-            mapped_ast_path: Path to mapped_ast.json file
+            ast_folder: (Deprecated) Path to folder containing AST JSON files
+            mapped_ast_path: (Deprecated) Path to mapped_ast.json file
+            ast_data: Optional list of AST data dictionaries (from ASTExtractor)
+            mapped_ast: Optional mapped AST dictionary (from CodeMapper)
             
         Returns:
             Dictionary with counts of documents written
         """
-        logger.info(f"Starting WeaviateCodeWriter with ast_folder={ast_folder}, mapped_ast_path={mapped_ast_path}")
+        logger.info(f"Starting WeaviateCodeWriter")
         
-        # Load data using folder scanner
-        ast_files = ASTFolderScanner().scan(ast_folder)
-        mapped_ast = load_json_file(mapped_ast_path) or {}
+        # Load data: Use in-memory if provided, else fall back to files
+        ast_files = []
+        if ast_data:
+            logger.info(f"Using provided in-memory AST data ({len(ast_data)} files)")
+            ast_files = ast_data
+        elif ast_folder:
+            logger.info(f"Scanning AST folder: {ast_folder}")
+            ast_files = ASTFolderScanner().scan(ast_folder)
+            
+        mapped_ast_data = {}
+        if mapped_ast:
+             logger.info("Using provided in-memory mapped AST")
+             mapped_ast_data = mapped_ast
+        elif mapped_ast_path:
+             logger.info(f"Loading mapped AST from: {mapped_ast_path}")
+             mapped_ast_data = load_json_file(mapped_ast_path) or {}
         
         # Process to documents
         ast_documents = self._ast_methods_to_documents(ast_files)
-        mapper_documents = self._mapped_ast_to_documents(mapped_ast)
+        mapper_documents = self._mapped_ast_to_documents(mapped_ast_data)
         
         # Combine all documents
         all_documents = ast_documents + mapper_documents

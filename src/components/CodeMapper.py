@@ -1,5 +1,5 @@
 from haystack import component, Document
-from typing import List
+from typing import List, Dict, Any
 from src.utils.modelGenerator import ModelGenerator
 from src.utils.llm_json_handler import LLMJsonHandler
 import logging
@@ -25,8 +25,8 @@ class CodeMapper:
     def __init__(self):
        self.generator = ModelGenerator("code_mapper").get_generator()
 
-    @component.output_types(mapped_ast_data_list=dict)
-    def run(self, ast_data_list: List[dict]):
+    @component.output_types(mapped_ast_data_list=Dict[str, Any])
+    def run(self, ast_data_list: List[Dict[str, Any]]):
         all_docs = []
         prompt_template = Template("""### ROLE
         You are a Static Code Analysis Engine. Your task is to identify internal method dependencies within a given class.
@@ -116,7 +116,7 @@ class CodeMapper:
             logger.error(f"Failed to generate Code mapping: {e}")
             raise RuntimeError(f"Could not generate Code mapping.") from e
 
-        return output
+        return {"mapped_ast_data_list": output}
 
 
                 
