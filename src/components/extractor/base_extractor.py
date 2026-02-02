@@ -7,14 +7,17 @@ from tree_sitter_language_pack import get_language
 import yaml
 import json
 
+from src.utils.config_loader import load_config
+
 
 
 class BaseASTExtractor(ABC):
     """
     Abstract Base Class for language-specific AST extraction.
     """
-    def __init__(self, language_name: str):
+    def __init__(self, language_name: str, config_path: str = "config.yaml"):
         self.language_name = language_name
+        self.config = load_config(config_path)['ast_extractor']
         self.language = self._load_language()
         self.parser = Parser(self.language) if self.language else None
         self.query_cache: Dict[str, Query] = {}
@@ -106,32 +109,28 @@ class BaseASTExtractor(ABC):
         return chunks
 
     def handle_extractor_output(self, chunks: List[Dict[str, Any]], file_path: str) -> List[Dict[str, Any]]:
-        # read from config.yaml
-        with open('config.yaml', 'r') as f:
-            config = yaml.safe_load(f)
-
         # Extract file name from path
         file_name = file_path.split('/')[-1] + '.json'
         
         # Enrich chunks with file_name and class_name, and trim newlines
         chunks = self._enrich_chunks(chunks, file_name)
 
-        if config['verbose']:
+        if self.config['verbose']:
             print(json.dumps(chunks, indent=2))
         
-        if config['save_ast']:
+        if self.config['save_ast']:
             # create directory if not exists
-            if not os.path.exists(config['save_ast_path']):
-                os.makedirs(config['save_ast_path'])
+            if not os.path.exists(self.config['save_ast_path']):
+                os.makedirs(self.config['save_ast_path'])
 
             if not chunks:
                 print(f"No chunks found for {file_name}")
                 return []
             
-            with open(config['save_ast_path'] + "/" + file_name, 'w') as f:
+            with open(self.config['save_ast_path'] + "/" + file_name, 'w') as f:
                 json.dump(chunks, f, indent=2)
                 
-            print(f"Saved AST to {config['save_ast_path'] + '/' + file_name}")
+            print(f"Saved AST to {self.config['save_ast_path'] + '/' + file_name}")
         return chunks
     
     @abstractmethod

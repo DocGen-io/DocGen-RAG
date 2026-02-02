@@ -2,16 +2,18 @@ import json
 import os
 import time
 from typing import Dict, List, Any
-from src.core.config import settings
+from src.utils.config_loader import load_config
 from src.core.security import SecurityAnalyzer
+
 
 class DocGenerator:
     """
     Generates the final documentation artifacts: Swagger.json, examples.ts, Postman Collection.
     """
 
-    def __init__(self, output_dir: str = "output"):
+    def __init__(self, output_dir: str = "output", config_path: str = "config.yaml"):
         self.output_base = output_dir
+        self.config = load_config(config_path)
 
     def create_output_folder(self) -> str:
         timestamp = time.strftime("%Y%m%d-%H%M%S")
@@ -52,8 +54,6 @@ class DocGenerator:
     def _build_swagger(self, data: List[Dict], alerts: List[str]) -> Dict:
         paths = {}
         for item in data:
-            # Grouping Logic: users/{id} -> group 'users'
-            # We assume 'item' has 'path', 'method', 'description', 'parameters', etc.
             path = item.get("path", "/")
             method = item.get("method", "get").lower()
             
@@ -75,10 +75,11 @@ class DocGenerator:
                 }
             }
         
+        app_config = self.config.get("app", {})
         return {
             "openapi": "3.0.0",
             "info": {
-                "title": settings.config["app"].get("APP_NAME", "Generated API"),
+                "title": app_config.get("APP_NAME", "Generated API"),
                 "version": "1.0.0",
                 "description": "Automatically generated documentation.\n" + "\n".join(alerts)
             },

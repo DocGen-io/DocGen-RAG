@@ -34,6 +34,7 @@ dependencies = [
 
 [project.scripts]
 ast-extractor = "src.components.extractor.ast_extractor:main"
+documentation-pipeline = "src.pipelines.documentation_pipeline:main"
 
 
 

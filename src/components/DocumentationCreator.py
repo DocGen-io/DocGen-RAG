@@ -236,12 +236,15 @@ class DocumentationCreator:
     @component.output_types(
         methods_processed=int,
         methods_failed=int,
-        output_files=Dict[str, Dict[str, str]]
+        output_files=Dict[str, Dict[str, str]],
+        output_dir=str
     )
     def run(
         self,
-        mapped_ast_path: str,
-        ast_folder: str = None
+        mapped_ast_path: str = "mapped_ast.json",
+        ast_folder: str = None,
+        mapped_ast: Optional[Dict[str, Any]] = None,
+        ast_data: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         """
         Process mapped AST and generate API documentation.
@@ -249,21 +252,35 @@ class DocumentationCreator:
         Args:
             mapped_ast_path: Path to mapped_ast.json file
             ast_folder: Optional, path to AST folder (used for additional context)
+            mapped_ast: Optional in-memory mapped AST dictionary
+            ast_data: Optional in-memory AST data list
             
         Returns:
             Dictionary with processing results
         """
-        logger.info(f"Starting DocumentationCreator: mapped_ast={mapped_ast_path}")
+        logger.info(f"Starting DocumentationCreator")
         
-        # Load mapped_ast
-        mapped_ast = load_json_file(mapped_ast_path) or {}
+        # Load mapped_ast: Use in-memory if provided
+        mapped_ast_data = {}
+        if mapped_ast:
+             logger.info("Using provided in-memory mapped AST")
+             mapped_ast_data = mapped_ast
+        else:
+             logger.info(f"Loading mapped AST from: {mapped_ast_path}")
+             mapped_ast_data = load_json_file(mapped_ast_path) or {}
         
-        # Load AST data for additional context (method definitions, paths, etc.)
-        ast_data = ASTFolderScanner().scan(ast_folder) if ast_folder else []
+        # Load AST data
+        ast_data_list = []
+        if ast_data:
+             logger.info(f"Using provided in-memory AST data ({len(ast_data)} files)")
+             ast_data_list = ast_data
+        elif ast_folder:
+             logger.info(f"Scanning AST folder: {ast_folder}")
+             ast_data_list = ASTFolderScanner().scan(ast_folder)
         
         # Build lookup for method details from AST
         method_details = {}
-        for ast_file in ast_data:
+        for ast_file in ast_data_list:
             for file_data in ast_file.get("data", [ast_file]):
                 for cls in (file_data if isinstance(file_data, list) else [file_data]):
                     class_name = cls.get("class_name", "")
@@ -278,14 +295,15 @@ class DocumentationCreator:
                         }
         
         # Get API methods from mapped_ast
-        api_methods = self._get_api_methods(mapped_ast)
+        api_methods = self._get_api_methods(mapped_ast_data)
         
         if not api_methods:
             logger.warning("No API methods found to document")
             return {
                 "methods_processed": 0,
                 "methods_failed": 0,
-                "output_files": {}
+                "output_files": {},
+                "output_dir": self.output_dir
             }
         
         methods_processed = 0
@@ -330,7 +348,8 @@ class DocumentationCreator:
         result = {
             "methods_processed": methods_processed,
             "methods_failed": methods_failed,
-            "output_files": output_files
+            "output_files": output_files,
+            "output_dir": self.output_dir
         }
         
         logger.info(f"DocumentationCreator complete: {methods_processed} processed, {methods_failed} failed")
