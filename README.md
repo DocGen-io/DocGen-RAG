@@ -99,60 +99,102 @@ Set the following environment variables (e.g., in a `.env` file or export them):
 ## Current RAG System Chart
 ```mermaid
 graph TD
+
+    %% Compare
+    SL{"Is Supported Language!"}
+    SF{"Is Supported Framework!"}
+    HE{"Hash Exists!"}
+    
+    %% Stop
+    SFF{{"Stop for this file!"}}
+   %% Stop(["Error: Not a REST API"])
+
+
+    %% Error
+    Error(["Stop & Log Error"])
+
+
     %%  Input Sources
     Input1(["Local Codebase Folder"])
     Input2(["GitHub Repo URL"])
-    
+
+    SH["Source Handler"]
     %% 2-3. Processing
-    LF[" Language Finder"]
-    FF[" Framework Finder"]
+    LF["Language Finder"]
+    FD["Framework Detector (Using AST Queries)"]
+    DF("Dependency Finder")
+    FH("File Hasher")
+    DS[(" Vectorization Weaviate Storage")]
+    AST["AST Extractor"]
+    CM["Code Mapper"]
+    EGR["Endpoint Documentation Generator"]
+    DM["Documentation Merger"]
+
+
+    Output("Docuemntation as Json Output")
+
+ 
     
-    %%  Decision Logic
-    RF{"REST Component Finder"}
-    Stop(["Error: Not a REST API"])
-    
-    %%  Vectorization
-    SaveLatest[(" Vectorization Weaviate Storage")]
-    
-    %% 8-9. Documentation Logic
-    CheckDB{" Doc Template exists"}
-    WebSearch[" Web Search Latest API Specs"]
-    VEC[" Weaviate Latest Framework Docs"]
-    
-    %% 10-13. Retrieval and Generation
-    Retriever[" Context Retriever Tenant Isolated"]
-    Rerank[" Reranking and Prompt Augmentation"]
-    LLM[" Final LLM Generation JSON"]
-    HTML[" Static HTML Documentation"]
+   
+
 
     %% Connections
-    Input1 --> LF
-    Input2 --> LF
-    LF --> FF
-    FF --> RF
-    
-    RF -- No --> Stop
-    RF -- Yes --> VEC
-    
-    VEC --> CheckDB
-    
-    CheckDB -- No --> WebSearch
-    WebSearch --> SaveLatest
-    SaveLatest --> Retriever
-    
-    CheckDB -- Yes --> Retriever
-    
-    Retriever --> Rerank
-    Rerank --> LLM
-    LLM --> HTML
+    Input1 --> SH
+    Input2 --> SH
+    SH --> LF
+    LF --> SL
+    SL -- No --> Error
+    SL -- Yes --> FD
+    FD --> SF
+    SF -- No --> Error
+    SF -- Yes --> DF
+    DF -- List OF Deps --> FH
+    FH -- Compare With Store --> DS
+    DS --> HE
+    HE -- Yes --> SFF
+    HE -- NO --> AST
+    AST -- To be mapped --> CM
+    AST -- To be saved --> DS
+    CM -- Map --> DS
+    DS -- Get Saved Map --> CM
+    DS --> EGR
+    EGR --> DM
+    DM --> Output
 
-    %% Styling
-    style Stop fill:#ff0000,stroke:#333
-    style VEC fill:#0000ff,stroke:#333
-    style SaveLatest fill:#0000ff,stroke:#333
-    style RF fill:#301934,stroke:#000
-    style CheckDB fill:#301934,stroke:#d4a017
-    style Input1 fill:#001,stroke:#333
-    style Input2 fill:#001,stroke:#333
+
+      
+  %% Inputs: Deep Navy/Slate
+  style Input1 fill:#2c3e50,stroke:#5dade2,stroke-width:2px,color:#fff
+  style Input2 fill:#2c3e50,stroke:#5dade2,stroke-width:2px,color:#fff
+  style SH     fill:#34495e,stroke:#5dade2,stroke-width:1px,color:#fff
+
+  %% Logic/Analyzers: Sage/Forest
+  style LF     fill:#2d5a27,stroke:#a9dfbf,stroke-width:1px,color:#fff
+  style FD     fill:#2d5a27,stroke:#a9dfbf,stroke-width:1px,color:#fff
+  style DF     fill:#2d5a27,stroke:#a9dfbf,stroke-width:1px,color:#fff
+  style AST    fill:#2d5a27,stroke:#a9dfbf,stroke-width:1px,color:#fff
+  style CM     fill:#2d5a27,stroke:#a9dfbf,stroke-width:1px,color:#fff
+
+  %% Decisions: Muted Amber/Gold (High visibility for logic gates)
+  style SL     fill:#7d6608,stroke:#f1c40f,stroke-width:2px,color:#fff
+  style SF     fill:#7d6608,stroke:#f1c40f,stroke-width:2px,color:#fff
+  style HE     fill:#7d6608,stroke:#f1c40f,stroke-width:2px,color:#fff
+
+  %% Processing/Storage: Deep Purple/Indigo
+  style FH     fill:#4a235a,stroke:#a569bd,stroke-width:1px,color:#fff
+  style DS     fill:#1b2631,stroke:#5dade2,stroke-width:2px,color:#fff
+  style EGR    fill:#4a235a,stroke:#a569bd,stroke-width:1px,color:#fff
+  style DM     fill:#4a235a,stroke:#a569bd,stroke-width:1px,color:#fff
+
+  %% Errors & Stops: Muted Crimson
+  style SFF    fill:#641e16,stroke:#ec7063,stroke-width:2px,color:#fff
+  style Error  fill:#641e16,stroke:#ec7063,stroke-width:2px,color:#fff
+
+ style Output fill:#0e6251,stroke:#1abc9c,stroke-width:2px,color:#fff
+    
+    
+  
+
+
 
 ```
