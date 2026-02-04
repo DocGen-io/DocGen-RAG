@@ -13,10 +13,7 @@ import logging
 from src.components.LanguageFinder import LanguageFinder
 from src.utils.config_loader import load_config
 
-from .java_extractor import JavaASTExtractor
-from .typescript_extractor import TypeScriptASTExtractor
-from .python_extractor import PythonASTExtractor
-from .csharp_extractor import CSharpASTExtractor
+from .general_extractor import GeneralExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -27,27 +24,15 @@ class ASTExtractor:
     Haystack component that extracts AST from source files.
     
     Routes to the appropriate language-specific extractor based on file type.
-    
-    Usage:
-        extractor = ASTExtractor()
-        result = extractor.run(file_paths=["/path/to/file.java"])
     """
     
     def __init__(self, config_path: str = "config.yaml"):
         """
         Initialize the ASTExtractor component.
-        
-        Args:
-            config_path: Path to configuration file
         """
         self.config = load_config(config_path)
         self._language_finder = LanguageFinder()
-        self._extractors = {
-            'java': JavaASTExtractor(),
-            'typescript': TypeScriptASTExtractor(),
-            'python': PythonASTExtractor(),
-            'c_sharp': CSharpASTExtractor(),
-        }
+      
     
     def _extract_file(self, file_path: str) -> List[Dict[str, Any]]:
         """Extract AST from a single file."""
@@ -56,11 +41,7 @@ class ASTExtractor:
             logger.warning(f"Unknown language for file: {file_path}")
             return []
         
-        if language not in self._extractors:
-            logger.warning(f"No extractor for language: {language}")
-            return []
-        
-        return self._extractors[language].extract(file_path)
+        return GeneralExtractor(language).extract(file_path)
     
     @component.output_types(
         ast_data=List[Dict[str, Any]],
