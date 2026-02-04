@@ -8,15 +8,12 @@ import os
 import json
 from haystack import component
 from typing import List, Dict, Any, Optional
-import logging
 
 from src.components.LanguageFinder import LanguageFinder
 from src.utils.config_loader import load_config
+from src.utils.logger import DocGenLogger
 
 from .general_extractor import GeneralExtractor
-
-logger = logging.getLogger(__name__)
-
 
 @component
 class ASTExtractor:
@@ -31,6 +28,7 @@ class ASTExtractor:
         Initialize the ASTExtractor component.
         """
         self.config = load_config(config_path)
+        self.logger = DocGenLogger(self.__class__.__name__)
         self._language_finder = LanguageFinder()
       
     
@@ -38,7 +36,7 @@ class ASTExtractor:
         """Extract AST from a single file."""
         language = self._language_finder.detect(file_path)
         if language == 'unknown':
-            logger.warning(f"Unknown language for file: {file_path}")
+            self.logger.warning(f"Unknown language for file: {file_path}", location="_extract_file")
             return []
         
         return GeneralExtractor(language).extract(file_path)
@@ -67,7 +65,7 @@ class ASTExtractor:
         
         for file_path in file_paths:
             if not os.path.exists(file_path):
-                logger.warning(f"File not found: {file_path}")
+                self.logger.warning(f"File not found: {file_path}", location="ast_extractor.run")
                 files_failed += 1
                 continue
             
@@ -79,10 +77,10 @@ class ASTExtractor:
                 else:
                     files_failed += 1
             except Exception as e:
-                logger.error(f"Error extracting {file_path}: {e}")
+                self.logger.error(f"Error extracting {file_path}: {e}", location="ast_extractor.run")
                 files_failed += 1
         
-        logger.info(f"Extracted AST from {files_processed} files, {files_failed} failed")
+        self.logger.info(f"Extracted AST from {files_processed} files, {files_failed} failed", location="ast_extractor.run")
         
         return {
             "ast_data": all_ast_data,
