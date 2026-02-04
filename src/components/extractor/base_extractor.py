@@ -1,13 +1,12 @@
-from abc import ABC, abstractmethod
-from typing import Tuple, Optional, List, Dict, Any, Union
-import os
 import re
-from tree_sitter import Language, Parser, Tree, Query
-from tree_sitter_language_pack import get_language
-import yaml
+import os
 import json
-
+import yaml
+from abc import ABC, abstractmethod
 from src.utils.config_loader import load_config
+from tree_sitter_language_pack import get_language
+from tree_sitter import Language, Parser, Tree, Query
+from typing import Tuple, Optional, List, Dict, Any, Union
 
 
 
@@ -22,12 +21,17 @@ class BaseASTExtractor(ABC):
         self.parser = Parser(self.language) if self.language else None
         self.query_cache: Dict[str, Query] = {}
 
+
     def _load_language(self) -> Optional[Language]:
-        try:
-            return get_language(self.language_name)
-        except Exception as e:
-            print(f"Error loading language {self.language_name}: {e}")
-            return None
+        names_to_try = [self.language_name, self.language_name.replace('_', ''), self.language_name.replace('sharp', '_sharp')]
+        for name in names_to_try:
+            try:
+                lang = get_language(name)
+                if lang: return lang
+            except Exception:
+                continue
+        print(f"Error loading language {self.language_name}")
+        return None
 
     def _load_query(self, query_path: str) -> Optional[Query]:
         if query_path in self.query_cache:
