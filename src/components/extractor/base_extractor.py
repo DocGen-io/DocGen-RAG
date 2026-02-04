@@ -4,6 +4,7 @@ import json
 import yaml
 from abc import ABC, abstractmethod
 from src.utils.config_loader import load_config
+from src.utils.logger import DocGenLogger
 from tree_sitter_language_pack import get_language
 from tree_sitter import Language, Parser, Tree, Query
 from typing import Tuple, Optional, List, Dict, Any, Union
@@ -17,6 +18,7 @@ class BaseASTExtractor(ABC):
     def __init__(self, language_name: str, config_path: str = "config.yaml"):
         self.language_name = language_name
         self.config = load_config(config_path)['ast_extractor']
+        self.logger = DocGenLogger(self.__class__.__name__)
         self.language = self._load_language()
         self.parser = Parser(self.language) if self.language else None
         self.query_cache: Dict[str, Query] = {}
@@ -30,7 +32,7 @@ class BaseASTExtractor(ABC):
                 if lang: return lang
             except Exception:
                 continue
-        print(f"Error loading language {self.language_name}")
+        self.logger.error(f"Error loading language {self.language_name}", location="_load_language")
         return None
 
     def _load_query(self, query_path: str) -> Optional[Query]:
@@ -48,7 +50,7 @@ class BaseASTExtractor(ABC):
             self.query_cache[query_path] = query
             return query
         except Exception as e:
-            print(f"Error loading query {query_path}: {e}")
+            self.logger.error(f"Error loading query {query_path}: {e}", location="_load_query")
             return None
 
     def parse_file(self, file_path: str) -> Tuple[Optional[Tree], Optional[bytes]]:
@@ -61,7 +63,7 @@ class BaseASTExtractor(ABC):
             tree = self.parser.parse(code_bytes)
             return tree, code_bytes
         except Exception as e:
-            print(f"Error parsing {file_path}: {e}")
+            self.logger.error(f"Error parsing {file_path}: {e}", location="parse_file")
             return None, None
 
     def _get_text(self, node, code_bytes: bytes) -> str:
@@ -120,7 +122,7 @@ class BaseASTExtractor(ABC):
         chunks = self._enrich_chunks(chunks, file_name)
 
         if self.config['verbose']:
-            print(json.dumps(chunks, indent=2))
+            self.logger.info(json.dumps(chunks, indent=2), location="handle_extractor_output")
         
         if self.config['save_ast']:
             # create directory if not exists
@@ -128,13 +130,13 @@ class BaseASTExtractor(ABC):
                 os.makedirs(self.config['save_ast_path'])
 
             if not chunks:
-                print(f"No chunks found for {file_name}")
+                self.logger.warning(f"No chunks found for {file_name}", location="handle_extractor_output")
                 return []
             
             with open(self.config['save_ast_path'] + "/" + file_name, 'w') as f:
                 json.dump(chunks, f, indent=2)
                 
-            print(f"Saved AST to {self.config['save_ast_path'] + '/' + file_name}")
+            self.logger.info(f"Saved AST to {self.config['save_ast_path'] + '/' + file_name}", location="handle_extractor_output")
         return chunks
     
     @abstractmethod
