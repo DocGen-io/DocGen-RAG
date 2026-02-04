@@ -16,8 +16,9 @@ from src.utils.output_format_builders import SwaggerBuilder, PostmanCollectionBu
 from src.utils.json_loader import load_json_file
 from src.utils.config_loader import load_config
 from src.utils.folder_scanners import EndpointFolderScanner
+from src.utils.logger import DocGenLogger
 
-logger = logging.getLogger(__name__)
+logger = DocGenLogger(__name__)
 
 
 @component
@@ -76,7 +77,9 @@ class DocumentationMerger:
         # Use provided output_dir or default from config
         output_dir = output_dir or self.default_output_dir
         
-        logger.info(f"Starting DocumentationMerger on {output_dir}")
+        output_dir = output_dir or self.default_output_dir
+        
+        logger.info(f"Starting DocumentationMerger on {output_dir}", location="run")
         
         # Scan for endpoint folders
         endpoints = self.endpoint_scanner.scan(output_dir)
@@ -134,7 +137,8 @@ class DocumentationMerger:
         
         logger.info(
             f"DocumentationMerger complete: {result['endpoints_merged']} endpoints merged. "
-            f"Swagger: {swagger_path}, Postman: {postman_path}"
+            f"Swagger: {swagger_path}, Postman: {postman_path}",
+            location="run"
         )
         
         return result

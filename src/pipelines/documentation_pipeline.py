@@ -31,9 +31,10 @@ from src.components.DocumentationCreator import DocumentationCreator
 from src.components.DocumentationMerger import DocumentationMerger
 from src.utils.config_loader import load_config
 from src.utils.output_format_builders.mapped_ast_builder import MappedAstBuilder
+from src.utils.logger import DocGenLogger
 import traceback
 
-logger = logging.getLogger(__name__)
+logger = DocGenLogger(__name__)
 
 
 class DocumentationPipeline:
@@ -65,9 +66,10 @@ class DocumentationPipeline:
                 tracer_provider = register(endpoint="http://127.0.0.1:6006/v1/traces")
                 HaystackInstrumentor().instrument(tracer_provider=tracer_provider)
                 DocumentationPipeline._instrumented = True
-                logger.info("Phoenix tracing enabled")
+                DocumentationPipeline._instrumented = True
+                logger.info("Phoenix tracing enabled", location="_setup_tracing")
             except Exception as e:
-                logger.warning(f"Failed to setup Phoenix tracing: {e}")
+                logger.warning(f"Failed to setup Phoenix tracing: {e}", location="_setup_tracing")
 
     def _build_pipeline(self):
         """Build the single unified pipeline."""
@@ -132,7 +134,7 @@ class DocumentationPipeline:
             Dictionary with pipeline results
         """
         try:
-            logger.info(f"Starting unified pipeline run for {path} ({source_type})")
+            logger.info(f"Starting unified pipeline run for {path} ({source_type})", location="run")
             
             result = self.pipeline.run(
                 {
@@ -175,7 +177,7 @@ class DocumentationPipeline:
             
         except Exception as e:
             error_msg = f"Pipeline failed: {str(e)}\n{traceback.format_exc()}"
-            logger.error(error_msg)
+            logger.error(error_msg, location="run")
             
             return {
                 "status": "failed",
@@ -191,7 +193,7 @@ def main():
     path = sys.argv[1] if len(sys.argv) > 1 else "apis-test/nestjs"
     
     pipeline = DocumentationPipeline()
-    result = pipeline.run(source_type="git", path=path)
+    result = pipeline.run(source_type="git" if len(sys.argv) > 1 else "local", path=path)
     
     print("\n=== Pipeline Result ===")
     for key, value in result.items():

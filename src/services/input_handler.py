@@ -4,6 +4,9 @@ import tempfile
 import git
 from pathlib import Path
 from typing import Optional
+from src.utils.logger import DocGenLogger
+
+logger = DocGenLogger(__name__)
 
 class InputHandler:
     """
@@ -27,7 +30,7 @@ class InputHandler:
             final_url = repo_url.replace("https://", f"https://{credentials}@")
 
         try:
-            print(f"Cloning {repo_url} into {self.temp_dir}...")
+            logger.info(f"Cloning {repo_url} into {self.temp_dir}...", location="process_git_repo")
             git.Repo.clone_from(final_url, self.temp_dir)
             return self.temp_dir
         except Exception as e:
