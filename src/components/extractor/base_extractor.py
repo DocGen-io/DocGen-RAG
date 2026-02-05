@@ -17,7 +17,9 @@ class BaseASTExtractor(ABC):
     """
     def __init__(self, language_name: str, config_path: str = "config.yaml"):
         self.language_name = language_name
-        self.config = load_config(config_path)['ast_extractor']
+        full_config = load_config(config_path)
+        self.config = full_config['ast_extractor']
+        self.config['queries'] = full_config.get('queries', {})
         self.logger = DocGenLogger(self.__class__.__name__)
         self.language = self._load_language()
         self.parser = Parser(self.language) if self.language else None

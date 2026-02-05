@@ -3,7 +3,6 @@ from typing import List, Dict, Any, Optional
 from tree_sitter import QueryCursor, Node
 from .base_extractor import BaseASTExtractor
 
-QUERIES_DIR = os.path.join(os.path.dirname(__file__), 'queries', 'general')
 
 class GeneralExtractor(BaseASTExtractor):
     """
@@ -12,7 +11,7 @@ class GeneralExtractor(BaseASTExtractor):
     """
     def __init__(self, language_name: str):
         super().__init__(language_name)
-        self.query_path = os.path.join(QUERIES_DIR, f"{language_name}.scm")
+        self.query_path = os.path.join(self.config["queries"]["general"], f"{language_name}.scm")
         self.CONTAINER_TAGS = ["class_name", "interface_name", "record_name"]
         self.METHOD_TAGS = ["method_name", "method_call"]
     
