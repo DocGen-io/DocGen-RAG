@@ -142,6 +142,6 @@ class BaseASTExtractor(ABC):
         return chunks
     
     @abstractmethod
-    def extract(self, file_path: str) -> List[Dict[str, Any]]:
+    def extract(self, file_path: str) -> List[Dict[str, Any]] | Optional[str]:
         pass
 

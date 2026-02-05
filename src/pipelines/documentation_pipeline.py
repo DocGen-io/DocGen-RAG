@@ -25,6 +25,7 @@ import json
 from src.components.SourceHandler import SourceHandler
 from src.components.FrameworkValidator import FrameworkValidator
 from src.components.extractor.ast_extractor import ASTExtractor
+from src.components.extractor.framework_detector import FrameworkDetector
 from src.components.CodeMapper import CodeMapper
 from src.components.WeaviateCodeWriter import WeaviateCodeWriter
 from src.components.DocumentationCreator import DocumentationCreator
@@ -77,6 +78,8 @@ class DocumentationPipeline:
         source_handler = SourceHandler()
         framework_validator = FrameworkValidator(self.config_path)
         ast_extractor = ASTExtractor(self.config_path)
+        f_detector = FrameworkDetector(self.config_path)
+
         code_mapper = CodeMapper()
         weaviate_writer = WeaviateCodeWriter(weaviate_url=self.weaviate_url)
         doc_creator = DocumentationCreator(
@@ -89,6 +92,7 @@ class DocumentationPipeline:
         self.pipeline.add_component("source_handler", source_handler)
         self.pipeline.add_component("framework_validator", framework_validator)
         self.pipeline.add_component("ast_extractor", ast_extractor)
+        self.pipeline.add_component("f_detector", f_detector)
         self.pipeline.add_component("code_mapper", code_mapper)
         self.pipeline.add_component("weaviate_writer", weaviate_writer)
         self.pipeline.add_component("doc_creator", doc_creator)
@@ -98,6 +102,10 @@ class DocumentationPipeline:
         # 1. Source -> Validator
         self.pipeline.connect("source_handler.file_paths", "framework_validator.file_paths")
         self.pipeline.connect("source_handler.working_dir", "framework_validator.working_dir")
+        
+
+        self.pipeline.connect("framework_validator.file_paths", "f_detector.file_paths")
+
         
         # 2. Validator -> AST
         self.pipeline.connect("framework_validator.file_paths", "ast_extractor.file_paths")

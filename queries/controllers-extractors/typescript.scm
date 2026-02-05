@@ -1,5 +1,4 @@
-(class_declaration
-  (decorator
-    (call_expression
-      function: (identifier) @controller-decoration))
-  (#eq? @controller-decoration "Controller"))
+(decorator 
+  (call_expression 
+    function: (identifier) @decorator_name 
+    (#eq? @decorator_name "Controller")))
