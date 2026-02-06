@@ -29,12 +29,12 @@ class ASTExtractor:
         """
         self.config = load_config(config_path)
         self.logger = DocGenLogger(self.__class__.__name__)
-        self._language_finder = LanguageFinder()
       
     
-    def _extract_file(self, file_path: str) -> List[Dict[str, Any]]:
+    def _extract_file(self, file_metadata: Dict[str, str]) -> List[Dict[str, Any]]:
         """Extract AST from a single file."""
-        language = self._language_finder.detect(file_path)
+        language = file_metadata['language']
+        file_path = file_metadata['path']
         if language == 'unknown':
             self.logger.warning(f"Unknown language for file: {file_path}", location="_extract_file")
             return []
@@ -46,7 +46,7 @@ class ASTExtractor:
         files_processed=int,
         files_failed=int
     )
-    def run(self, file_paths: List[str]) -> Dict[str, Any]:
+    def run(self, files: List[Dict[str, str]]) -> Dict[str, Any]:
         """
         Extract AST from multiple source files.
         
@@ -63,14 +63,15 @@ class ASTExtractor:
         files_processed = 0
         files_failed = 0
         
-        for file_path in file_paths:
+        for file_metadata in files:
+            file_path = file_metadata['path']
             if not os.path.exists(file_path):
                 self.logger.warning(f"File not found: {file_path}", location="ast_extractor.run")
                 files_failed += 1
                 continue
             
             try:
-                ast_data = self._extract_file(file_path)
+                ast_data = self._extract_file(file_metadata)
                 if ast_data:
                     all_ast_data.extend(ast_data)
                     files_processed += 1

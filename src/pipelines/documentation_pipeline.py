@@ -76,7 +76,6 @@ class DocumentationPipeline:
         """Build the single unified pipeline."""
         # Initialize components
         source_handler = SourceHandler()
-        framework_validator = FrameworkValidator(self.config_path)
         ast_extractor = ASTExtractor(self.config_path)
         f_detector = FrameworkDetector(self.config_path)
 
@@ -90,25 +89,17 @@ class DocumentationPipeline:
         
         # Add components
         self.pipeline.add_component("source_handler", source_handler)
-        self.pipeline.add_component("framework_validator", framework_validator)
         self.pipeline.add_component("ast_extractor", ast_extractor)
-        self.pipeline.add_component("f_detector", f_detector)
         self.pipeline.add_component("code_mapper", code_mapper)
         self.pipeline.add_component("weaviate_writer", weaviate_writer)
         self.pipeline.add_component("doc_creator", doc_creator)
         self.pipeline.add_component("doc_merger", doc_merger)
+        self.pipeline.add_component("f_detector", f_detector)
         
         # Connect components
         # 1. Source -> Validator
-        self.pipeline.connect("source_handler.file_paths", "framework_validator.file_paths")
-        self.pipeline.connect("source_handler.working_dir", "framework_validator.working_dir")
-        
-
-        self.pipeline.connect("framework_validator.file_paths", "f_detector.file_paths")
-
-        
-        # 2. Validator -> AST
-        self.pipeline.connect("framework_validator.file_paths", "ast_extractor.file_paths")
+        self.pipeline.connect("source_handler.files", "f_detector.files")
+        self.pipeline.connect("source_handler.files", "ast_extractor.files")
         
         # 3. AST -> CodeMapper
         self.pipeline.connect("ast_extractor.ast_data", "code_mapper.ast_data_list")

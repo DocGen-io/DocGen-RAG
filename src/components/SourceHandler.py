@@ -9,7 +9,8 @@ import tempfile
 import logging
 from haystack import component
 from typing import List, Dict, Any, Optional
-
+from src.components.extractor.framework_detector import FrameworkDetector
+from src.components.LanguageFinder import LanguageFinder
 logger = logging.getLogger(__name__)
 
 # Directories to exclude from file collection
@@ -30,11 +31,12 @@ class SourceHandler:
     
     def __init__(self):
         self.temp_dir: Optional[str] = None
+        self.language_finder = LanguageFinder()
+        self.framework_detector = FrameworkDetector()
     
     @component.output_types(
-        file_paths=List[str],
+        files=List[Dict[str, str]],
         working_dir=str,
-        file_count=int
     )
     def run(self, source_type: str, path: str, credentials: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -58,14 +60,16 @@ class SourceHandler:
             raise ValueError(f"Invalid source_type: {source_type}. Must be 'git' or 'local'")
         
         # Collect file paths
-        file_paths = self._collect_files(working_dir)
+        files = self._collect_files(working_dir)
+
+        if not files:
+            raise ValueError("Please provide a codebase that creates REST APIs")
         
-        logger.info(f"Collected {len(file_paths)} files from {working_dir}")
+        logger.info(f"Collected {len(files)} files from {working_dir}")
         
         return {
-            "file_paths": file_paths,
+            "files": files,
             "working_dir": working_dir,
-            "file_count": len(file_paths)
         }
     
     def _clone_repo(self, repo_url: str, credentials: Optional[str] = None) -> str:
@@ -100,8 +104,14 @@ class SourceHandler:
             self.cleanup()
             raise RuntimeError(f"Failed to copy local folder: {e}")
     
-    def _collect_files(self, directory: str) -> List[str]:
-        """Collect all file paths from directory, excluding common ignore patterns."""
+    def _collect_files(self, directory: str) -> List[Dict[str, str]]:
+        """
+        
+        Collect all file paths from directory, excluding common ignore patterns.
+        Operations on files:
+            1- Language Finder - > to find the language of the file.
+        
+        """
         file_paths = []
         
         for root, dirs, files in os.walk(directory):
@@ -109,10 +119,14 @@ class SourceHandler:
             dirs[:] = [d for d in dirs if d not in EXCLUDED_DIRS]
             
             for f in files:
-                file_paths.append(os.path.join(root, f))
+                language = self.language_finder.detect(os.path.join(root, f))
+                if language != 'unknown':
+                    file_metadata = {}
+                    file_metadata['path'] = os.path.join(root, f)
+                    file_metadata['language'] = language
+                    file_paths.append(file_metadata)
         
-        return sorted(file_paths)
-    
+        return file_paths
     def cleanup(self):
         """Remove temporary directory."""
         if self.temp_dir and os.path.exists(self.temp_dir):
