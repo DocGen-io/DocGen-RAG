@@ -65,10 +65,9 @@ ast_extractor:
   save_ast_path: "ast" # folder name where AST will be saved
 
 # Framework settings
-frameworks: ["springboot", "django", "dotnet"]
 
 # API frameworks supported for documentation
-api_frameworks: ["Django", "NestJS", "SpringBoot", ".NET"]
+api_frameworks: ["NestJS", "SpringBoot", ".NET"]
 
 
 queries:
