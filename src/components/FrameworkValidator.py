@@ -21,20 +21,20 @@ class FrameworkValidator:
         self.api_frameworks = set(self.config.get("api_frameworks", []))
 
     @component.output_types(
-        file_paths=List[str],
+        files=List[Dict[str, str]],
         working_dir=str,
         framework=str
     )
-    def run(self, file_paths: List[str], working_dir: str):
+    def run(self, files: List[Dict[str, str]], working_dir: str):
         """
         Validate framework and pass through file paths if valid.
         
         Args:
-            file_paths: List of file paths from SourceHandler
+            files: List of file metadata from SourceHandler
             working_dir: Working directory of the project
             
         Returns:
-            Dict with file_paths, working_dir, and framework if valid.
+            Dict with files, working_dir, and framework if valid.
             Raises ValueError if framework is invalid (stopping pipeline).
         """
         logger.info(f"Validating framework in {working_dir}...")
@@ -47,7 +47,7 @@ class FrameworkValidator:
             raise ValueError(error_msg)
             
         return {
-            "file_paths": file_paths,
+            "files": files,
             "working_dir": working_dir,
             "framework": framework
         }

@@ -25,15 +25,17 @@ import json
 from src.components.SourceHandler import SourceHandler
 from src.components.FrameworkValidator import FrameworkValidator
 from src.components.extractor.ast_extractor import ASTExtractor
+from src.components.extractor.framework_detector import FrameworkDetector
 from src.components.CodeMapper import CodeMapper
 from src.components.WeaviateCodeWriter import WeaviateCodeWriter
 from src.components.DocumentationCreator import DocumentationCreator
 from src.components.DocumentationMerger import DocumentationMerger
 from src.utils.config_loader import load_config
 from src.utils.output_format_builders.mapped_ast_builder import MappedAstBuilder
+from src.utils.logger import DocGenLogger
 import traceback
 
-logger = logging.getLogger(__name__)
+logger = DocGenLogger(__name__)
 
 
 class DocumentationPipeline:
@@ -65,9 +67,10 @@ class DocumentationPipeline:
                 tracer_provider = register(endpoint="http://127.0.0.1:6006/v1/traces")
                 HaystackInstrumentor().instrument(tracer_provider=tracer_provider)
                 DocumentationPipeline._instrumented = True
-                logger.info("Phoenix tracing enabled")
+                DocumentationPipeline._instrumented = True
+                logger.info("Phoenix tracing enabled", location="_setup_tracing")
             except Exception as e:
-                logger.warning(f"Failed to setup Phoenix tracing: {e}")
+                logger.warning(f"Failed to setup Phoenix tracing: {e}", location="_setup_tracing")
 
     def _build_pipeline(self):
         """Build the single unified pipeline."""
@@ -75,6 +78,8 @@ class DocumentationPipeline:
         source_handler = SourceHandler()
         framework_validator = FrameworkValidator(self.config_path)
         ast_extractor = ASTExtractor(self.config_path)
+        # f_detector = FrameworkDetector(self.config_path) # Unused/Redundant
+
         code_mapper = CodeMapper()
         weaviate_writer = WeaviateCodeWriter(weaviate_url=self.weaviate_url)
         doc_creator = DocumentationCreator(
@@ -91,14 +96,15 @@ class DocumentationPipeline:
         self.pipeline.add_component("weaviate_writer", weaviate_writer)
         self.pipeline.add_component("doc_creator", doc_creator)
         self.pipeline.add_component("doc_merger", doc_merger)
+        # self.pipeline.add_component("f_detector", f_detector)
         
         # Connect components
         # 1. Source -> Validator
-        self.pipeline.connect("source_handler.file_paths", "framework_validator.file_paths")
+        self.pipeline.connect("source_handler.files", "framework_validator.files")
         self.pipeline.connect("source_handler.working_dir", "framework_validator.working_dir")
         
         # 2. Validator -> AST
-        self.pipeline.connect("framework_validator.file_paths", "ast_extractor.file_paths")
+        self.pipeline.connect("framework_validator.files", "ast_extractor.files")
         
         # 3. AST -> CodeMapper
         self.pipeline.connect("ast_extractor.ast_data", "code_mapper.ast_data_list")
@@ -132,7 +138,7 @@ class DocumentationPipeline:
             Dictionary with pipeline results
         """
         try:
-            logger.info(f"Starting unified pipeline run for {path} ({source_type})")
+            logger.info(f"Starting unified pipeline run for {path} ({source_type})", location="run")
             
             result = self.pipeline.run(
                 {
@@ -142,7 +148,7 @@ class DocumentationPipeline:
                         "credentials": credentials
                     }
                 },
-                include_outputs_from={"framework_validator", "ast_extractor", "doc_creator"}
+                include_outputs_from={"framework_validator", "ast_extractor", "doc_creator", "weaviate_writer", "doc_merger"}
             )
             
             # Extract results for report
@@ -175,7 +181,7 @@ class DocumentationPipeline:
             
         except Exception as e:
             error_msg = f"Pipeline failed: {str(e)}\n{traceback.format_exc()}"
-            logger.error(error_msg)
+            logger.error(error_msg, location="run")
             
             return {
                 "status": "failed",
@@ -191,7 +197,7 @@ def main():
     path = sys.argv[1] if len(sys.argv) > 1 else "apis-test/nestjs"
     
     pipeline = DocumentationPipeline()
-    result = pipeline.run(source_type="git", path=path)
+    result = pipeline.run(source_type="git" if len(sys.argv) > 1 else "local", path=path)
     
     print("\n=== Pipeline Result ===")
     for key, value in result.items():

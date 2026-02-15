@@ -8,18 +8,12 @@ import os
 import json
 from haystack import component
 from typing import List, Dict, Any, Optional
-import logging
 
 from src.components.LanguageFinder import LanguageFinder
 from src.utils.config_loader import load_config
+from src.utils.logger import DocGenLogger
 
-from .java_extractor import JavaASTExtractor
-from .typescript_extractor import TypeScriptASTExtractor
-from .python_extractor import PythonASTExtractor
-from .csharp_extractor import CSharpASTExtractor
-
-logger = logging.getLogger(__name__)
-
+from .general_extractor import GeneralExtractor
 
 @component
 class ASTExtractor:
@@ -27,47 +21,32 @@ class ASTExtractor:
     Haystack component that extracts AST from source files.
     
     Routes to the appropriate language-specific extractor based on file type.
-    
-    Usage:
-        extractor = ASTExtractor()
-        result = extractor.run(file_paths=["/path/to/file.java"])
     """
     
     def __init__(self, config_path: str = "config.yaml"):
         """
         Initialize the ASTExtractor component.
-        
-        Args:
-            config_path: Path to configuration file
         """
         self.config = load_config(config_path)
-        self._language_finder = LanguageFinder()
-        self._extractors = {
-            'java': JavaASTExtractor(),
-            'typescript': TypeScriptASTExtractor(),
-            'python': PythonASTExtractor(),
-            'c_sharp': CSharpASTExtractor(),
-        }
+        self.logger = DocGenLogger(self.__class__.__name__)
+      
     
-    def _extract_file(self, file_path: str) -> List[Dict[str, Any]]:
+    def _extract_file(self, file_metadata: Dict[str, str]) -> List[Dict[str, Any]]:
         """Extract AST from a single file."""
-        language = self._language_finder.detect(file_path)
+        language = file_metadata['language']
+        file_path = file_metadata['path']
         if language == 'unknown':
-            logger.warning(f"Unknown language for file: {file_path}")
+            self.logger.warning(f"Unknown language for file: {file_path}", location="_extract_file")
             return []
         
-        if language not in self._extractors:
-            logger.warning(f"No extractor for language: {language}")
-            return []
-        
-        return self._extractors[language].extract(file_path)
+        return GeneralExtractor(language).extract(file_path, file_metadata)
     
     @component.output_types(
         ast_data=List[Dict[str, Any]],
         files_processed=int,
         files_failed=int
     )
-    def run(self, file_paths: List[str]) -> Dict[str, Any]:
+    def run(self, files: List[Dict[str, str]]) -> Dict[str, Any]:
         """
         Extract AST from multiple source files.
         
@@ -84,24 +63,25 @@ class ASTExtractor:
         files_processed = 0
         files_failed = 0
         
-        for file_path in file_paths:
+        for file_metadata in files:
+            file_path = file_metadata['path']
             if not os.path.exists(file_path):
-                logger.warning(f"File not found: {file_path}")
+                self.logger.warning(f"File not found: {file_path}", location="ast_extractor.run")
                 files_failed += 1
                 continue
             
             try:
-                ast_data = self._extract_file(file_path)
+                ast_data = self._extract_file(file_metadata)
                 if ast_data:
                     all_ast_data.extend(ast_data)
                     files_processed += 1
                 else:
                     files_failed += 1
             except Exception as e:
-                logger.error(f"Error extracting {file_path}: {e}")
+                self.logger.error(f"Error extracting {file_path}: {e}", location="ast_extractor.run")
                 files_failed += 1
         
-        logger.info(f"Extracted AST from {files_processed} files, {files_failed} failed")
+        self.logger.info(f"Extracted AST from {files_processed} files, {files_failed} failed", location="ast_extractor.run")
         
         return {
             "ast_data": all_ast_data,

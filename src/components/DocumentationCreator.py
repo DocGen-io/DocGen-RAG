@@ -242,7 +242,6 @@ class DocumentationCreator:
     def run(
         self,
         mapped_ast_path: str = "mapped_ast.json",
-        ast_folder: str = None,
         mapped_ast: Optional[Dict[str, Any]] = None,
         ast_data: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
@@ -274,10 +273,9 @@ class DocumentationCreator:
         if ast_data:
              logger.info(f"Using provided in-memory AST data ({len(ast_data)} files)")
              ast_data_list = ast_data
-        elif ast_folder:
-             logger.info(f"Scanning AST folder: {ast_folder}")
-             ast_data_list = ASTFolderScanner().scan(ast_folder)
         
+
+
         # Build lookup for method details from AST
         method_details = {}
         for ast_file in ast_data_list:

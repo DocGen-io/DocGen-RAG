@@ -1,6 +1,9 @@
 import os
 import abc
 from typing import List, Optional
+from src.utils.logger import DocGenLogger
+
+logger = DocGenLogger(__name__)
 
 class FrameworkStrategy(abc.ABC):
     @abc.abstractmethod
@@ -102,7 +105,7 @@ class FrameworkDetector:
 
             for file in files:
                 file_path = os.path.join(root, file)
-                print(file_path)
+                logger.debug(file_path, location="detect")
                 if os.path.isdir(file_path):
                    return  self.detect(file_path)
 

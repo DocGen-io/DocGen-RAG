@@ -12,7 +12,7 @@ rag:
 # General Settings
 WEAVIATE_URL: "http://127.0.0.1:8080"
 WEAVIATE_API_KEY: null
-tracing: true
+tracing: false
 
 
 # code mapper settings
@@ -65,9 +65,14 @@ ast_extractor:
   save_ast_path: "ast" # folder name where AST will be saved
 
 # Framework settings
-frameworks: ["springboot", "django", "dotnet"]
 
 # API frameworks supported for documentation
-api_frameworks: ["Django", "NestJS", "SpringBoot", ".NET"]
+api_frameworks: ["NestJS", "SpringBoot", ".NET"]
 
 
+queries:
+  controllers-extractors: "queries/controllers-extractors/"
+  general: "queries/general/"
+  imports: "queries/imports/"
+
+  
