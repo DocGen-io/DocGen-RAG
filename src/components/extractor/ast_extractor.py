@@ -39,7 +39,7 @@ class ASTExtractor:
             self.logger.warning(f"Unknown language for file: {file_path}", location="_extract_file")
             return []
         
-        return GeneralExtractor(language).extract(file_path)
+        return GeneralExtractor(language).extract(file_path, file_metadata)
     
     @component.output_types(
         ast_data=List[Dict[str, Any]],
