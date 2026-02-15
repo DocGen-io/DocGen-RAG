@@ -124,6 +124,10 @@ class SourceHandler:
                     file_metadata = {}
                     file_metadata['path'] = os.path.join(root, f)
                     file_metadata['language'] = language
+                    try:
+                        file_metadata['relative_path'] = os.path.relpath(os.path.join(root, f), directory)
+                    except ValueError:
+                         file_metadata['relative_path'] = f 
                     file_paths.append(file_metadata)
         
         return file_paths
