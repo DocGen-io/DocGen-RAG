@@ -76,8 +76,9 @@ class DocumentationPipeline:
         """Build the single unified pipeline."""
         # Initialize components
         source_handler = SourceHandler()
+        framework_validator = FrameworkValidator(self.config_path)
         ast_extractor = ASTExtractor(self.config_path)
-        f_detector = FrameworkDetector(self.config_path)
+        # f_detector = FrameworkDetector(self.config_path) # Unused/Redundant
 
         code_mapper = CodeMapper()
         weaviate_writer = WeaviateCodeWriter(weaviate_url=self.weaviate_url)
@@ -89,17 +90,21 @@ class DocumentationPipeline:
         
         # Add components
         self.pipeline.add_component("source_handler", source_handler)
+        self.pipeline.add_component("framework_validator", framework_validator)
         self.pipeline.add_component("ast_extractor", ast_extractor)
         self.pipeline.add_component("code_mapper", code_mapper)
         self.pipeline.add_component("weaviate_writer", weaviate_writer)
         self.pipeline.add_component("doc_creator", doc_creator)
         self.pipeline.add_component("doc_merger", doc_merger)
-        self.pipeline.add_component("f_detector", f_detector)
+        # self.pipeline.add_component("f_detector", f_detector)
         
         # Connect components
         # 1. Source -> Validator
-        self.pipeline.connect("source_handler.files", "f_detector.files")
-        self.pipeline.connect("source_handler.files", "ast_extractor.files")
+        self.pipeline.connect("source_handler.files", "framework_validator.files")
+        self.pipeline.connect("source_handler.working_dir", "framework_validator.working_dir")
+        
+        # 2. Validator -> AST
+        self.pipeline.connect("framework_validator.files", "ast_extractor.files")
         
         # 3. AST -> CodeMapper
         self.pipeline.connect("ast_extractor.ast_data", "code_mapper.ast_data_list")
@@ -143,7 +148,7 @@ class DocumentationPipeline:
                         "credentials": credentials
                     }
                 },
-                include_outputs_from={"framework_validator", "ast_extractor", "doc_creator"}
+                include_outputs_from={"framework_validator", "ast_extractor", "doc_creator", "weaviate_writer", "doc_merger"}
             )
             
             # Extract results for report
