@@ -25,7 +25,7 @@ class GeneralExtractor(BaseASTExtractor):
             return None
 
 
-    def extract(self, file_path: str) -> List[Dict[str, Any]]:
+    def extract(self, file_path: str, file_metadata: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         query = self._load_query(self.query_path)
         tree, code_bytes = self.parse_file(file_path)
         if not all([query, tree, code_bytes]):
@@ -50,7 +50,9 @@ class GeneralExtractor(BaseASTExtractor):
                     # Find the body/declaration node to act as the ID anchor
                     body_node = captures.get(tag.replace("_name", "_body"), 
                                 captures.get(tag.replace("_name", "_declaration"), 
-                                captures.get(tag, [None])))[0]
+                                captures.get(tag.replace("_name", "_node"),
+                                captures.get(tag.replace("_name", "_definition"),
+                                captures.get(tag, [None])))))[0]
                     
                     if not body_node or body_node.id in structure_map:
                         continue
@@ -62,20 +64,41 @@ class GeneralExtractor(BaseASTExtractor):
                     elif any(k in name for k in ["Controller", "Service", "Resolver"]):
                         ctype = next(k for k in ["Controller", "Service", "Resolver"] if k in name)
 
+                    # Extract base path from decorator if available
+                    base_path = ""
+                    if "class_decorator_path" in captures:
+                        base_path = self._get_capture_text(captures, "class_decorator_path", code_bytes)
+                        # Clean up quotes if present
+                        base_path = base_path.strip("'\"")
+
+                    # Get relative path from metadata or fallback
+                    rel_path = file_path
+                    if file_metadata and 'relative_path' in file_metadata:
+                        rel_path = file_metadata['relative_path']
+                    else:
+                        try:
+                            rel_path = os.path.relpath(file_path, os.getcwd())
+                        except ValueError:
+                            pass
+
                     structure_map[body_node.id] = {
                         "class_name": name,
                         "class_type": ctype,
-                        "base_path": "",
+                        "base_path": base_path,
                         "methods": [],
-                        "file_name": file_name
+                        "file_name": file_name,
+                        "file_path": rel_path
                     }
+
 
             # 2. Handle Methods and Functions
             for tag in self.METHOD_TAGS:
+                
+            
                 if tag in captures:
                     m_name = self._get_capture_text(captures, tag, code_bytes)
                     m_body = captures.get(tag.replace("_name", "_body"), 
-                             captures.get("method_body", [None]))[0]
+                             captures.get("method_definition", [None]))[0]
                     
                     if not m_body: continue
 
@@ -96,8 +119,9 @@ class GeneralExtractor(BaseASTExtractor):
                     else:
                         global_methods.append(method_data)
 
+            
             # 3. Handle Decorators (Apply to parent container or methods)
-            for d_tag in ["decorator", "decorators"]:
+            for d_tag in ["decorator", "decorators", "method_decorator", "arrow_method_decorator"]:
                 if d_tag in captures:
                     d_node = captures[d_tag][0]
                     d_text = self._get_text(d_node, code_bytes)
@@ -105,7 +129,9 @@ class GeneralExtractor(BaseASTExtractor):
                     
                     if parent:
                         # If decorator contains a Verb, mark the last added method as an API route
-                        verb = next((v for v in ["Get", "Post", "Put", "Delete", "Patch"] if v in d_text), None)
+                        # If decorator contains a Verb, mark the last added method as an API route
+                        # Check for both Title Case (NestJS, .NET) and lowercase (FastAPI) verbs
+                        verb = next((v for v in ["Get", "Post", "Put", "Delete", "Patch", "get", "post", "put", "delete", "patch"] if v in d_text), None)
                         if verb and parent["methods"]:
                             parent["methods"][-1]["is_api_route"] = True
                             parent["methods"][-1]["method_type"] = verb.upper()
