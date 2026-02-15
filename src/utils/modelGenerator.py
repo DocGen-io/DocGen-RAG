@@ -1,7 +1,9 @@
 import logging
 from typing import Any, Dict
 from haystack_integrations.components.generators.ollama import OllamaGenerator
-from haystack_integrations.components.generators.google_ai import GoogleAIGeminiGenerator
+from haystack_integrations.components.generators.google_genai import (
+    GoogleGenAIChatGenerator,
+)
 from src.utils.config_loader import load_config
 from src.utils.logger import DocGenLogger
 
@@ -35,7 +37,7 @@ class ModelGenerator:
             
             elif self.active_provider == "googlegemini":
                 # Ensure you have GOOGLE_API_KEY in your environment
-                return GoogleAIGeminiGenerator(model=model)
+                return GoogleAIGeminiChatGenerator(model=model)
             
             else:
                 raise ValueError(f"Unsupported provider: {self.active_provider}")
