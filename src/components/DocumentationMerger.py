@@ -12,7 +12,7 @@ import os
 import json
 import logging
 
-from src.utils.output_format_builders import SwaggerBuilder, PostmanCollectionBuilder
+from src.utils.output_format_builders import SwaggerBuilder
 from src.utils.json_loader import load_json_file
 from src.utils.config_loader import load_config
 from src.utils.folder_scanners import EndpointFolderScanner
@@ -57,7 +57,6 @@ class DocumentationMerger:
     
     @component.output_types(
         swagger_path=str,
-        postman_path=str,
         endpoints_merged=int
     )
     def run(self, output_dir: Optional[str] = None) -> Dict[str, Any]:
@@ -103,12 +102,7 @@ class DocumentationMerger:
         
         swagger_spec = swagger_builder.build(swagger_endpoints)
         
-        # Build Postman collection
-        postman_builder = PostmanCollectionBuilder(
-            collection_name=self.api_title,
-            base_url=self.base_url
-        )
-        
+     
         postman_endpoints = [
             {
                 "method_name": ep["method_name"],
@@ -117,27 +111,20 @@ class DocumentationMerger:
             for ep in endpoints
         ]
         
-        postman_collection = postman_builder.build(postman_endpoints)
-        
         # Save output files
         swagger_path = os.path.join(output_dir, "swagger.json")
-        postman_path = os.path.join(output_dir, "postman_collection.json")
         
         with open(swagger_path, "w", encoding="utf-8") as f:
             json.dump(swagger_spec, f, indent=2)
         
-        with open(postman_path, "w", encoding="utf-8") as f:
-            json.dump(postman_collection, f, indent=2)
-        
         result = {
             "swagger_path": swagger_path,
-            "postman_path": postman_path,
             "endpoints_merged": len(endpoints)
         }
         
         logger.info(
             f"DocumentationMerger complete: {result['endpoints_merged']} endpoints merged. "
-            f"Swagger: {swagger_path}, Postman: {postman_path}",
+            f"Swagger: {swagger_path}",
             location="run"
         )
         

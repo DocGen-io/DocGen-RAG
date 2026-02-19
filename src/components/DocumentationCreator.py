@@ -2,7 +2,7 @@
 DocumentationCreator - Haystack component for generating REST API documentation.
 
 This component analyzes code_mapper output, fetches dependency information from Weaviate,
-and uses LLM to generate comprehensive API documentation in Postman and Swagger formats.
+and uses LLM to generate comprehensive API documentation in Swagger formats.
 """
 
 from haystack import component
@@ -10,7 +10,6 @@ from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
 from typing import Dict, Any, List, Optional
 import json
 import os
-import logging
 from string import Template
 
 from src.utils.modelGenerator import ModelGenerator
@@ -19,8 +18,9 @@ from src.utils.weaviate_utils import fetch_by_method_name
 from src.utils.llm_json_handler import LLMJsonHandler
 from src.utils.config_loader import load_config
 from src.utils.folder_scanners import ASTFolderScanner
+from src.utils.logger import DocGenLogger
 
-logger = logging.getLogger(__name__)
+logger = DocGenLogger(__name__)
 
 
 DOCUMENTATION_PROMPT = Template("""### ROLE
@@ -55,9 +55,7 @@ $dependencies_context
 
 ### OUTPUT FORMAT
 Return a JSON object with exactly two keys:
-1. "postman": A valid Postman request object containing:
-   - name, method, url, header, body (if applicable), description
-2. "swagger": A valid OpenAPI 3.0 path operation object containing:
+"swagger": A valid OpenAPI 3.0 path operation object containing:
    - summary, description, parameters, requestBody (if applicable), responses, security
 
 RETURN ONLY VALID JSON. NO MARKDOWN CODE BLOCKS. NO EXPLANATIONS.
@@ -70,7 +68,7 @@ class DocumentationCreator:
     """
     Haystack component that generates REST API documentation from code analysis.
     
-    Processes mapped_ast.json and AST files to create Postman and Swagger documentation
+    Processes mapped_ast.json and AST files to create Swagger documentation
     for each API endpoint.
     """
     
@@ -158,15 +156,6 @@ class DocumentationCreator:
         full_path = f"{base_path.rstrip('/')}/{path.lstrip('/')}" if path else base_path
         
         return {
-            "postman": {
-                "name": method_name,
-                "request": {
-                    "method": http_method or "GET",
-                    "header": [],
-                    "url": {"raw": f"{{{{baseUrl}}}}{full_path}"}
-                },
-                "description": f"Auto-generated documentation for {method_name}. Manual review recommended."
-            },
             "swagger": {
                 "summary": method_name,
                 "description": f"Endpoint: {method_name}. Documentation could not be fully generated.",
@@ -188,11 +177,10 @@ class DocumentationCreator:
                 response = self.generator.run(prompt)["replies"][0]
                 result = LLMJsonHandler.parse(response)
                 
-                # Validate structure
-                if "postman" in result or "swagger" in result:
+                if  "swagger" in result:
                     return result
                 else:
-                    logger.warning(f"Attempt {attempt + 1}: Missing postman/swagger keys, retrying...")
+                    logger.warning(f"Attempt {attempt + 1}: Missing swagger keys, retrying...")
                     
             except json.JSONDecodeError as e:
                 logger.warning(f"Attempt {attempt + 1}: JSON parse error: {e}")
@@ -209,19 +197,12 @@ class DocumentationCreator:
 
     
     def _save_outputs(self, method_name: str, documentation: Dict) -> Dict[str, str]:
-        """Save Postman and Swagger JSON files to output directory."""
+        """Save Swagger JSON files to output directory."""
         # Create method-specific output directory
         method_dir = os.path.join(self.output_dir, method_name)
         os.makedirs(method_dir, exist_ok=True)
         
         saved_files = {}
-        
-        # Save Postman JSON
-        postman_data = documentation.get("postman", {})
-        postman_path = os.path.join(method_dir, "postman.json")
-        with open(postman_path, "w", encoding="utf-8") as f:
-            json.dump(postman_data, f, indent=2)
-        saved_files["postman"] = postman_path
         
         # Save Swagger JSON
         swagger_data = documentation.get("swagger", {})
