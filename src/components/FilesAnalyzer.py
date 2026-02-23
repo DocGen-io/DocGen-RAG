@@ -42,7 +42,7 @@ class FilesAnalyzer:
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             # Submit using absolute path, but keep relative path for the result key
             future_to_path = {
-                executor.submit(self.number_file_lines, f['path']): f['relative_path'] 
+                executor.submit(self.number_file_lines, f['path']): f['path']
                 for f in input_files
             }
             
@@ -54,7 +54,7 @@ class FilesAnalyzer:
                         results[rel_path] = res
                 except Exception as e:
                     logger.error(f"Thread error for {rel_path}: {e}")
-
+    
         end_time = time.time()
         elapsed_time = end_time - start_time
         logger.info(f"Processed {len(results)} files using {self.max_workers} threads in {elapsed_time:.2f} seconds.")
@@ -110,21 +110,16 @@ class FilesAnalyzer:
                         # Ensure the file_path key also is in the dictionary just in case
                         result['file_path'] = fp
                         results[fp] = result
+                        
+                        # Inject exact lines into every item in 'content'
+                        if 'content' in result and isinstance(result['content'], list):
+                            for item in result['content']:
+                                start_line = item.get('start_line')
+                                end_line = item.get('end_line')
+                                if start_line is not None and end_line is not None:
+                                    item['lines'] = self.get_exact_lines(fp, start_line, end_line)
 
-                        # Save output to disk if requested in config
-                        output_path = self.config.get("code_analyzer", {}).get("analyzer_output_path")
-                        if output_path:
-                            try:
-                                # Keep the original filename structure and save it out as JSON
-                                file_name = os.path.basename(fp)
-                                save_path = os.path.join(output_path, f"{file_name}.json")
-                                os.makedirs(output_path, exist_ok=True)
-                                
-                                with open(save_path, 'w', encoding='utf-8') as f:
-                                    json.dump(result, f, indent=4)
-                                logger.info(f"Saved analyzer output to {save_path}")
-                            except Exception as e:
-                                logger.error(f"Failed to save analyzer output for {fp}: {e}")
+                        self._save_analyzer_output(fp, result)
 
                 except Exception as e:
                     logger.error(f"Error analyzing file: {e}")
@@ -135,8 +130,34 @@ class FilesAnalyzer:
         
         return results
       
-        
+    
+    def _save_analyzer_output(self, file_path: str, result: Dict[str, Any]) -> None:
+        """Saves the analyzer output to a JSON file."""
+        output_path = self.config.get("code_analyzer", {}).get("analyzer_output_path")
+        if output_path:
+            try:
+                # Keep the original filename structure and save it out as JSON
+                file_name = os.path.basename(file_path)
+                save_path = os.path.join(output_path, f"{file_name}.json")
+                os.makedirs(output_path, exist_ok=True)
+                
+                with open(save_path, 'w', encoding='utf-8') as f:
+                    json.dump(result, f, indent=4)
+                logger.info(f"Saved analyzer output to {save_path}")
+            except Exception as e:
+                logger.error(f"Failed to save analyzer output for {file_path}: {e}")
 
+
+
+    # get exact lines from files using start_line and end_line
+    def get_exact_lines(self, file_path: str, start_line: int, end_line: int) -> List[str]:
+        """Gets exact lines from a file using start_line and end_line."""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return [line for i, line in enumerate(f) if start_line <= i+1 <= end_line]
+        except Exception as e:
+            logger.error(f"Failed to process {file_path}: {e}")
+            return None
         
     @component.output_types(
        files=List[Dict[str, List[str]]],
