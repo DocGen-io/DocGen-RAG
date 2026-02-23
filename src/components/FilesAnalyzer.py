@@ -6,8 +6,11 @@ from haystack import component
 from src.utils.logger import DocGenLogger
 from src.utils.modelGenerator import ModelGenerator
 from string import Template
+import threading
 from src.utils.config_loader import load_config
 from src.utils.llm_json_handler import LLMJsonHandler
+from prompts import file_analyzer_prompt
+from opentelemetry import context
 import json
 logger = DocGenLogger()
 
@@ -59,87 +62,79 @@ class FilesAnalyzer:
         return results
 
 
+    def analyze_single_file(self, file_path: str, content: List[str]) -> Dict[str, Any]:
+        """Analyzes a single file and returns the structured JSON output."""
+        logger.info(f"Analyzing file: {file_path} with thread #{threading.get_ident()}")
+    
+        content_str = "".join(content)
+        query = file_analyzer_prompt.substitute(query_data_file_path=file_path, query_data_file_content=content_str)
+        
+        # 2. Get LLM response
+        response = self.model_generator.run(query)['replies'][0]
+        
+        # 3. Parse response
+        json_output = LLMJsonHandler.parse_with_retry(
+            response, 
+            generator=self.model_generator, 
+            prompt=query,
+            max_retries=2
+        )
+        
+        return json_output
+
     def analyze_files(self, input_files: Dict[str, List[str]])-> Dict[str, Dict[str,Any]]:
         results = {}
         start_time = time.time()
-        prompt = Template("""
-        ### ROLE
-        You are a Static Code Analysis Engine. Your goal is to map function boundaries, internal call graphs, and API endpoints.
 
-        ### TASK
-        Analyze the provided file path and source code. Identify all classes, functions, and schemas. 
-        For every method, determine if it is an API endpoint (e.g., has decorators like @Get, @Post, @app.get, etc.).
+        ctx = context.get_current()
 
-        ### STRICT RULES
-        1. OUTPUT ONLY RAW JSON. No markdown backticks, no preamble.
-        2. If a method is NOT an API endpoint, set "is_api_method" to null.
-        3. "start_line" and "end_line" MUST be integers.
 
-        ### JSON SCHEMA STRUCTURE
-        { 
-            "file_path": "str",
-            "content": [
-                {
-                    "type": "class | function | schema",
-                    "name": "str",
-                    "start_line": int,
-                    "end_line": int,
-                    "is_api_method": {
-                        "method_type": "get | post | put | delete | patch",
-                        "path": "str"
-                    }, 
-                    "dependencies": [
-                        {
-                            "dependency_name": "str",
-                            "dependency_type": "stand-alone | class-method"
-                        }
-                    ]
-                }
-            ]
-        }
-
-        ### EXTRACTION RULES
-        - **API Detection:** If you see decorators (like `@Get('/')` or `@route`) or framework-specific routing, fill the "is_api_method" object. Otherwise, set it to null.
-        - **Internal Only:** Ignore external libraries (e.g., os, requests).
-        - **Data Shapes:** Prioritize DTOs, Schemas, and Models.
-
-        ### DATA TO ANALYZE
-        Path: $query_data_file_path
-        Content:
-        $query_data_file_content
-        """)
-
-        for key, value in input_files.items():
-            logger.info(f"Analyzing file: {key}")
+        def wrapped_analyze(file_path, content, ctx):
+            # Attach the parent context to this specific worker thread
+            token = context.attach(ctx)
+            try:
+                return file_path, self.analyze_single_file(file_path, content)
+            finally:
+                # detach to prevent memory leaks in the thread pool
+                context.detach(token)
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            futures = []
+            for key, value in input_files.items():
+                futures.append(executor.submit(wrapped_analyze, key, value, ctx))
             
-            # 1. Prepare query
-            content_str = "".join(value)
-            query = prompt.substitute(query_data_file_path=key, query_data_file_content=content_str)
-            
-            # 2. Get LLM response
-            response = self.model_generator.run(query)['replies'][0]
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    fp, result = future.result()
+                    if result is not None:
+                        # Ensure the file_path key also is in the dictionary just in case
+                        result['file_path'] = fp
+                        results[fp] = result
 
-            
-            # 4. SAVE TO INDIVIDUAL FILE
-            os.makedirs("analyzer_output", exist_ok=True)
-            # Safe way to get filename (e.g., 'app.ts' from 'src/app.ts')
-            clean_filename = os.path.basename(key) 
-            
-            json_output = LLMJsonHandler.parse_with_retry(
-                    response, 
-                    generator=self.model_generator, 
-                    prompt=query,
-                    max_retries=2
-                )
-            if json_output is not None:
-                with open(f"analyzer_output/{clean_filename}.json", "w", encoding='utf-8') as f:
-                    # Saving the structured_data makes it a real JSON file
-                    
-                    json.dump(json_output, f, indent=4)
+                        # Save output to disk if requested in config
+                        output_path = self.config.get("code_analyzer", {}).get("analyzer_output_path")
+                        if output_path:
+                            try:
+                                # Keep the original filename structure and save it out as JSON
+                                file_name = os.path.basename(fp)
+                                save_path = os.path.join(output_path, f"{file_name}.json")
+                                os.makedirs(output_path, exist_ok=True)
+                                
+                                with open(save_path, 'w', encoding='utf-8') as f:
+                                    json.dump(result, f, indent=4)
+                                logger.info(f"Saved analyzer output to {save_path}")
+                            except Exception as e:
+                                logger.error(f"Failed to save analyzer output for {fp}: {e}")
 
-        logger.info(f"Analyzed {len(results)} files in {time.time() - start_time:.2f}s")
+                except Exception as e:
+                    logger.error(f"Error analyzing file: {e}")
+        
+        end_time = time.time()
+        logger.info(f"Analyzed {len(results)} files in {end_time - start_time:.2f}s")
+
+        
         return results
-
+      
         
 
         

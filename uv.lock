@@ -739,6 +739,7 @@ dependencies = [
     { name = "accelerate" },
     { name = "arize-phoenix" },
     { name = "fastapi" },
+    { name = "gitignore-parser" },
     { name = "gitpython" },
     { name = "google-genai-haystack" },
     { name = "haystack-ai" },
@@ -761,6 +762,7 @@ requires-dist = [
     { name = "accelerate" },
     { name = "arize-phoenix", specifier = ">=4.0.0" },
     { name = "fastapi" },
+    { name = "gitignore-parser", specifier = ">=0.1.13" },
     { name = "gitpython" },
     { name = "google-genai-haystack" },
     { name = "haystack-ai" },
@@ -986,6 +988,12 @@ sdist = { url = "https://files.pythonhosted.org/packages/72/94/63b0fc47eb32792c7
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a0/61/5c78b91c3143ed5c14207f463aecfc8f9dbb5092fb2869baf37c273b2705/gitdb-4.0.12-py3-none-any.whl", hash = "sha256:67073e15955400952c6565cc3e707c554a4eea2e428946f7a4c162fab9bd9bcf", size = 62794, upload-time = "2025-01-02T07:20:43.624Z" },
 ]
+
+[[package]]
+name = "gitignore-parser"
+version = "0.1.13"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e5/51/e391a1a4238f18d0abb47be479b07af265ad4519022cf51b7da47ef82487/gitignore_parser-0.1.13.tar.gz", hash = "sha256:c7e10c8190accb8ae57fb3711889e73a9c0dbc04d4222b91ace8a4bf64d2f746", size = 5603, upload-time = "2025-08-25T06:33:22.704Z" }
 
 [[package]]
 name = "gitpython"
