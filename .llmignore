@@ -1,0 +1,63 @@
+# .llmignore
+
+# --- Base Version Control & Environments ---
+.git/
+.venv/
+venv/
+env/
+.idea/
+.vscode/
+__pycache__/
+
+# --- Node.js / NestJS ---
+node_modules/
+dist/
+coverage/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+tsconfig.build.json
+
+# Test files & Mocks
+*.spec.ts
+*.test.ts
+*.e2e-spec.ts
+__tests__/
+__mocks__/
+
+# --- Java / Spring Boot ---
+.mvn/
+.gradle/
+target/
+build/
+mvnw
+mvnw.cmd
+gradlew
+gradlew.bat
+
+# --- .NET / C# ---
+bin/
+obj/
+TestResults/
+.vs/
+*.csproj.user
+*.suo
+
+# Test Projects (common naming conventions)
+*Tests/
+*Test/
+*.UnitTests/
+*.IntegrationTests/
+
+
+# --- Common Configs & Boilerplate (Not useful for API docs) ---
+.gitignore
+.dockerignore
+Dockerfile
+docker-compose.yml
+.eslintrc*
+.prettierrc*
+jest.config.*
+nest-cli.json
+README.md
+LICENSE
