@@ -32,9 +32,7 @@ generators:
     api_key: ""
     model: "gemini-2.5-flash"
 
-code_mapper:
-  mapper_output_path: "mapped_ast.json"
-  active_generator: "ollama"
+
  
 # Documentation Creator settings
 doc_creator:
@@ -52,23 +50,8 @@ doc_merger:
 app:
   environment: "development"
 
-# Environment variables
-
-# AST Extractor settings
-ast_extractor:
-  verbose: false
-  save_ast: true
-  save_ast_path: "ast" # folder name where AST will be saved
-
-# Framework settings
 
 # API frameworks supported for documentation
 api_frameworks: ["NestJS", "SpringBoot", ".NET"]
 
 
-queries:
-  controllers-extractors: "queries/controllers-extractors/"
-  general: "queries/general/"
-  imports: "queries/imports/"
-
-  
