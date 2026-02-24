@@ -30,6 +30,7 @@ from src.utils.config_loader import load_config
 from src.utils.logger import DocGenLogger
 import traceback
 from src.components.FilesAnalyzer import FilesAnalyzer
+from src.components.EndpointGraphManager import EndpointGraphManager
 
 logger = DocGenLogger(__name__)
 
@@ -81,16 +82,20 @@ class DocumentationPipeline:
         # )
         # doc_merger = DocumentationMerger(self.config_path)
         files_analyzer = FilesAnalyzer()
+        graph_manager = EndpointGraphManager()
         
         # Add components
         self.pipeline.add_component("source_handler", source_handler)
         self.pipeline.add_component("files_analyzer", files_analyzer)
         self.pipeline.add_component("weaviate_writer", weaviate_writer)
+        self.pipeline.add_component("graph_manager", graph_manager)
 
         # Connect components
         # 1. Source -> Analyzer
         self.pipeline.connect("source_handler.files", "files_analyzer.input_files")
-        # 2. Analyzer -> Weaviate
+        # 2a. Analyzer -> GraphManager
+        self.pipeline.connect("files_analyzer.files", "graph_manager.analyzed_files")
+        # 2b. Analyzer -> Weaviate
         self.pipeline.connect("files_analyzer.files", "weaviate_writer.files")
     
     def run(
@@ -121,7 +126,7 @@ class DocumentationPipeline:
                         "credentials": credentials
                     }
                 },
-                include_outputs_from={"files_analyzer", "weaviate_writer"}
+                include_outputs_from={"files_analyzer", "weaviate_writer", "graph_manager"}
             )
             
             # Extract results for report
@@ -129,6 +134,7 @@ class DocumentationPipeline:
             
             
             writer_result = result.get("weaviate_writer", {})
+            graph_result = result.get("graph_manager", {})
             # merger_result = result.get("doc_merger", {})
             # doc_creator_result = result.get("doc_creator", {})
             
@@ -136,6 +142,7 @@ class DocumentationPipeline:
                 "status": "completed",
                 "files": len(files),
                 "documents_stored": writer_result.get("documents_written", 0),
+                "endpoint_graphs": len(graph_result.get("endpoint_graphs", {})),
                 # "methods_documented": doc_creator_result.get("methods_processed", 0),
                 # "endpoints_merged": merger_result.get("endpoints_merged", 0),
                 # "swagger_path": merger_result.get("swagger_path", ""),

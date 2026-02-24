@@ -12,3 +12,6 @@ mapped_ast.json
 
 .ignore
 analyzer_output
+
+
+dependencies.db
