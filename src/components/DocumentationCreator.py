@@ -17,7 +17,6 @@ from src.utils.json_loader import load_json_file
 from src.utils.weaviate_utils import fetch_by_method_name
 from src.utils.llm_json_handler import LLMJsonHandler
 from src.utils.config_loader import load_config
-from src.utils.folder_scanners import ASTFolderScanner
 from src.utils.logger import DocGenLogger
 from prompts import doc_creator_prompt as DOCUMENTATION_PROMPT
 logger = DocGenLogger(__name__)
