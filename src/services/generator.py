@@ -8,7 +8,7 @@ from src.core.security import SecurityAnalyzer
 
 class DocGenerator:
     """
-    Generates the final documentation artifacts: Swagger.json, examples.ts, Postman Collection.
+    Generates the final documentation artifacts: Swagger.json, examples.ts.
     """
 
     def __init__(self, output_dir: str = "output", config_path: str = "config.yaml"):
@@ -33,11 +33,6 @@ class DocGenerator:
         with open(swagger_path, "w") as f:
             json.dump(swagger, f, indent=2)
 
-        # 2. Postman Collection
-        postman = self._build_postman(extracted_data)
-        postman_path = os.path.join(output_path, "postman_collection.json")
-        with open(postman_path, "w") as f:
-            json.dump(postman, f, indent=2)
 
         # 3. Examples.ts
         examples_content = self._build_examples_ts(extracted_data)
@@ -47,7 +42,6 @@ class DocGenerator:
 
         return {
             "swagger": swagger_path,
-            "postman": postman_path,
             "examples": examples_path
         }
 
@@ -84,27 +78,6 @@ class DocGenerator:
                 "description": "Automatically generated documentation.\n" + "\n".join(alerts)
             },
             "paths": paths
-        }
-
-    def _build_postman(self, data: List[Dict]) -> Dict:
-        # Simplified Postman generation
-        item_list = []
-        for d in data:
-            item_list.append({
-                "name": d.get("path"),
-                "request": {
-                    "method": d.get("method", "GET").upper(),
-                    "url": {
-                        "raw": "{{base_url}}" + d.get("path"),
-                        "host": ["{{base_url}}"],
-                        "path": d.get("path").strip("/").split("/")
-                    }
-                }
-            })
-            
-        return {
-            "info": {"name": "Generated Collection", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
-            "item": item_list
         }
 
     def _build_examples_ts(self, data: List[Dict]) -> str:

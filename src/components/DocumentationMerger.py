@@ -2,8 +2,8 @@
 DocumentationMerger - Haystack component for merging endpoint documentation files.
 
 This component scans the output directory for individual endpoint folders,
-reads their swagger.json and postman.json files, and merges them into
-complete Swagger/OpenAPI 3.0 and Postman Collection v2.1 output files.
+reads their swagger.json files, and merges them into
+complete Swagger/OpenAPI 3.0 Collection v2.1 output files.
 """
 
 from haystack import component
@@ -12,7 +12,7 @@ import os
 import json
 import logging
 
-from src.utils.output_format_builders import SwaggerBuilder, PostmanCollectionBuilder
+from src.utils.output_format_builders import SwaggerBuilder
 from src.utils.json_loader import load_json_file
 from src.utils.config_loader import load_config
 from src.utils.folder_scanners import EndpointFolderScanner
@@ -25,13 +25,12 @@ logger = DocGenLogger(__name__)
 class DocumentationMerger:
     """
     Haystack component that merges individual endpoint documentation files
-    into complete Swagger and Postman Collection files.
+    into complete Swagger Collection files.
     
     Usage:
         merger = DocumentationMerger()
         result = merger.run(output_dir="output")
         print(f"Swagger: {result['swagger_path']}")
-        print(f"Postman: {result['postman_path']}")
     """
     
     def __init__(self, config_path: str = "config.yaml"):
@@ -57,7 +56,6 @@ class DocumentationMerger:
     
     @component.output_types(
         swagger_path=str,
-        postman_path=str,
         endpoints_merged=int
     )
     def run(self, output_dir: Optional[str] = None) -> Dict[str, Any]:
@@ -71,7 +69,6 @@ class DocumentationMerger:
         Returns:
             Dictionary with:
                 - swagger_path: Path to generated swagger.json
-                - postman_path: Path to generated postman_collection.json
                 - endpoints_merged: Number of endpoints merged
         """
         # Use provided output_dir or default from config
@@ -103,41 +100,20 @@ class DocumentationMerger:
         
         swagger_spec = swagger_builder.build(swagger_endpoints)
         
-        # Build Postman collection
-        postman_builder = PostmanCollectionBuilder(
-            collection_name=self.api_title,
-            base_url=self.base_url
-        )
-        
-        postman_endpoints = [
-            {
-                "method_name": ep["method_name"],
-                "data": ep["postman_data"]
-            }
-            for ep in endpoints
-        ]
-        
-        postman_collection = postman_builder.build(postman_endpoints)
-        
         # Save output files
         swagger_path = os.path.join(output_dir, "swagger.json")
-        postman_path = os.path.join(output_dir, "postman_collection.json")
         
         with open(swagger_path, "w", encoding="utf-8") as f:
             json.dump(swagger_spec, f, indent=2)
         
-        with open(postman_path, "w", encoding="utf-8") as f:
-            json.dump(postman_collection, f, indent=2)
-        
         result = {
             "swagger_path": swagger_path,
-            "postman_path": postman_path,
             "endpoints_merged": len(endpoints)
         }
         
         logger.info(
             f"DocumentationMerger complete: {result['endpoints_merged']} endpoints merged. "
-            f"Swagger: {swagger_path}, Postman: {postman_path}",
+            f"Swagger: {swagger_path}",
             location="run"
         )
         

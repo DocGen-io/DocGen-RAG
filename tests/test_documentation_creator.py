@@ -144,7 +144,6 @@ class TestOutputFileStructure:
                 creator.output_dir = tmpdir
                 
                 documentation = {
-                    "postman": {"name": "Test Endpoint", "method": "GET"},
                     "swagger": {"summary": "Test endpoint", "responses": {}}
                 }
                 
@@ -155,14 +154,9 @@ class TestOutputFileStructure:
                 assert os.path.isdir(method_dir)
                 
                 # Check files were created
-                assert os.path.exists(saved["postman"])
                 assert os.path.exists(saved["swagger"])
                 
-                # Verify JSON content
-                with open(saved["postman"]) as f:
-                    postman_data = json.load(f)
-                    assert postman_data["name"] == "Test Endpoint"
-                
+            
                 with open(saved["swagger"]) as f:
                     swagger_data = json.load(f)
                     assert swagger_data["summary"] == "Test endpoint"
@@ -170,34 +164,6 @@ class TestOutputFileStructure:
 
 class TestJsonFormat:
     """Tests for valid JSON output format."""
-    
-    def test_postman_json_is_valid(self):
-        """Verify Postman output is valid JSON."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            from src.components.DocumentationCreator import DocumentationCreator
-            
-            with patch.object(DocumentationCreator, '__init__', lambda self: None):
-                creator = DocumentationCreator()
-                creator.output_dir = tmpdir
-                
-                documentation = {
-                    "postman": {
-                        "name": "Get All Posts",
-                        "request": {
-                            "method": "GET",
-                            "header": [],
-                            "url": {"raw": "{{baseUrl}}/posts"}
-                        }
-                    },
-                    "swagger": {}
-                }
-                
-                saved = creator._save_outputs("getAllPosts", documentation)
-                
-                # Should not raise JSONDecodeError
-                with open(saved["postman"]) as f:
-                    data = json.load(f)
-                    assert "name" in data
     
     def test_swagger_json_is_valid_openapi_structure(self):
         """Verify Swagger output has OpenAPI-like structure."""
@@ -209,7 +175,6 @@ class TestJsonFormat:
                 creator.output_dir = tmpdir
                 
                 documentation = {
-                    "postman": {},
                     "swagger": {
                         "summary": "Get all posts",
                         "description": "Retrieves all blog posts",

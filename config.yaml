@@ -12,37 +12,31 @@ rag:
 # General Settings
 WEAVIATE_URL: "http://127.0.0.1:8080"
 WEAVIATE_API_KEY: null
-tracing: false
+tracing: true
 
 
 # code mapper settings
 
-
-code_mapper:
-  mapper_output_path: "mapped_ast.json"
+code_analyzer:
   active_generator: "ollama"
-  generators:
-    ollama:
-      url: "http://127.0.0.1:11434"
-      api_key: ""
-      model: "llama3"
-    gemini:
-      url: "https://generativelanguage.googleapis.com/v1beta/"
-      api_key: ""
-      model: "gemini-2.5-flash"
+  analyzer_output_path: "analyzer_output"
 
+
+generators:
+  ollama:
+    url: "http://127.0.0.1:11434"
+    api_key: ""
+    model: "llama3"
+  gemini:
+    url: "https://generativelanguage.googleapis.com/v1beta/"
+    api_key: ""
+    model: "gemini-2.5-flash"
+
+
+ 
 # Documentation Creator settings
 doc_creator:
   active_generator: "ollama"
-  generators:
-    ollama:
-      url: "http://127.0.0.1:11434"
-      api_key: ""
-      model: "llama3:latest"
-    gemini:
-      url: "https://generativelanguage.googleapis.com/v1beta/"
-      api_key: ""
-      model: "gemini-2.5-flash"
   output_dir: "output"
 
 # Documentation Merger settings
@@ -56,23 +50,8 @@ doc_merger:
 app:
   environment: "development"
 
-# Environment variables
-
-# AST Extractor settings
-ast_extractor:
-  verbose: false
-  save_ast: true
-  save_ast_path: "ast" # folder name where AST will be saved
-
-# Framework settings
 
 # API frameworks supported for documentation
 api_frameworks: ["NestJS", "SpringBoot", ".NET"]
 
 
-queries:
-  controllers-extractors: "queries/controllers-extractors/"
-  general: "queries/general/"
-  imports: "queries/imports/"
-
-  

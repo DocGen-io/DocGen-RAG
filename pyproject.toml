@@ -29,7 +29,8 @@ dependencies = [
     "google-genai-haystack",
     "accelerate",
     "tree-sitter",
-    "tree-sitter-language-pack"
+    "tree-sitter-language-pack",
+    "gitignore-parser>=0.1.13",
 ]
 
 [project.scripts]

@@ -6,15 +6,16 @@ Handles git repositories and local folders, collecting file paths for processing
 import os
 import shutil
 import tempfile
-import logging
-from haystack import component
+from pathlib import Path
 from typing import List, Dict, Any, Optional
-from src.components.extractor.framework_detector import FrameworkDetector
-from src.components.LanguageFinder import LanguageFinder
-logger = logging.getLogger(__name__)
 
-# Directories to exclude from file collection
-EXCLUDED_DIRS = {'node_modules', '.git', '__pycache__', '.venv', 'venv', '.idea', '.vscode'}
+from haystack import component
+
+from src.components.LanguageFinder import LanguageFinder
+from src.utils.llm_ignore_parser import get_llm_ignore_filter
+from src.utils.logger import DocGenLogger
+
+logger = DocGenLogger()
 
 
 @component
@@ -32,7 +33,6 @@ class SourceHandler:
     def __init__(self):
         self.temp_dir: Optional[str] = None
         self.language_finder = LanguageFinder()
-        self.framework_detector = FrameworkDetector()
     
     @component.output_types(
         files=List[Dict[str, str]],
@@ -48,22 +48,16 @@ class SourceHandler:
             credentials: Optional git credentials
             
         Returns:
-            file_paths: List of all file paths
-            working_dir: Working directory path
-            file_count: Number of files found
+            Dictionary containing collected files and the working directory.
         """
-        if source_type == "git":
-            working_dir = self._clone_repo(path, credentials)
-        elif source_type == "local":
-            working_dir = self._copy_local(path)
-        else:
-            raise ValueError(f"Invalid source_type: {source_type}. Must be 'git' or 'local'")
+        working_dir = self._prepare_working_directory(source_type, path, credentials)
         
-        # Collect file paths
+        self._apply_local_llmignore(working_dir)
         files = self._collect_files(working_dir)
 
         if not files:
-            raise ValueError("Please provide a codebase that creates REST APIs")
+            self.cleanup()
+            raise ValueError("Please provide a codebase that creates REST APIs. No valid files found.")
         
         logger.info(f"Collected {len(files)} files from {working_dir}")
         
@@ -71,14 +65,34 @@ class SourceHandler:
             "files": files,
             "working_dir": working_dir,
         }
+
+    def _prepare_working_directory(self, source_type: str, path: str, credentials: Optional[str]) -> str:
+        """Routes the input to the appropriate directory preparation method."""
+        if source_type == "git":
+            return self._clone_repo(path, credentials)
+        if source_type == "local":
+            return self._copy_local(path)
+        
+        raise ValueError(f"Invalid source_type: '{source_type}'. Must be 'git' or 'local'")
+
+    def _apply_local_llmignore(self, working_dir: str) -> None:
+        """Copies the main project's .llmignore to the working directory if applicable."""
+        # Using pathlib to cleanly navigate up 3 directories from the current file
+        project_root = Path(__file__).resolve().parents[2]
+        local_ignore_path = project_root / ".llmignore"
+        target_ignore_path = Path(working_dir) / ".llmignore"
+
+        if local_ignore_path.exists() and Path(working_dir) != local_ignore_path.parent:
+            shutil.copy2(local_ignore_path, target_ignore_path)
+            logger.info(f"Copied .llmignore from {local_ignore_path} to {working_dir}")
     
     def _clone_repo(self, repo_url: str, credentials: Optional[str] = None) -> str:
         """Clone git repository to temp directory."""
         import git
         
         self.temp_dir = tempfile.mkdtemp(prefix="docgen_")
-        
         final_url = repo_url
+        
         if credentials and "@" not in repo_url and "https://" in repo_url:
             final_url = repo_url.replace("https://", f"https://{credentials}@")
         
@@ -106,32 +120,33 @@ class SourceHandler:
     
     def _collect_files(self, directory: str) -> List[Dict[str, str]]:
         """
-        
         Collect all file paths from directory, excluding common ignore patterns.
-        Operations on files:
-            1- Language Finder - > to find the language of the file.
-        
+        Detects the programming language for each file.
         """
         file_paths = []
+        is_ignored = get_llm_ignore_filter(directory)
         
         for root, dirs, files in os.walk(directory):
-            # Remove excluded directories
-            dirs[:] = [d for d in dirs if d not in EXCLUDED_DIRS]
+            # gitignore_parser needs a trailing slash to correctly match directory rules
+            dirs[:] = [d for d in dirs if not is_ignored(os.path.join(root, d) + os.sep)]
             
-            for f in files:
-                language = self.language_finder.detect(os.path.join(root, f))
+            for file_name in files:
+                full_path = os.path.join(root, file_name)
+                
+                if is_ignored(full_path):
+                    continue
+
+                language = self.language_finder.detect(full_path)
                 if language != 'unknown':
-                    file_metadata = {}
-                    file_metadata['path'] = os.path.join(root, f)
-                    file_metadata['language'] = language
-                    try:
-                        file_metadata['relative_path'] = os.path.relpath(os.path.join(root, f), directory)
-                    except ValueError:
-                         file_metadata['relative_path'] = f 
-                    file_paths.append(file_metadata)
+                    file_paths.append({
+                        'path': full_path,
+                        'language': language,
+                        'relative_path': os.path.relpath(full_path, directory)
+                    })
         
         return file_paths
-    def cleanup(self):
+
+    def cleanup(self) -> None:
         """Remove temporary directory."""
         if self.temp_dir and os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
