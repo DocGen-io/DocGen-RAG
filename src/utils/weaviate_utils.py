@@ -8,9 +8,8 @@ with exact match filters on metadata fields.
 from typing import List, Optional
 from haystack.dataclasses import Document
 from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
-import logging
-
-logger = logging.getLogger(__name__)
+from .logger import DocGenLogger
+logger = DocGenLogger(__name__)
 
 
 def fetch_by_method_name(

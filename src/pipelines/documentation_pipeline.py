@@ -74,7 +74,7 @@ class DocumentationPipeline:
         source_handler = SourceHandler()
         # framework_validator = FrameworkValidator(self.config_path)
 
-        # weaviate_writer = WeaviateCodeWriter(weaviate_url=self.weaviate_url)
+        weaviate_writer = WeaviateCodeWriter(weaviate_url=self.weaviate_url)
         # doc_creator = DocumentationCreator(
         #     weaviate_url=self.weaviate_url,
         #     config_path=self.config_path
@@ -85,10 +85,13 @@ class DocumentationPipeline:
         # Add components
         self.pipeline.add_component("source_handler", source_handler)
         self.pipeline.add_component("files_analyzer", files_analyzer)
+        self.pipeline.add_component("weaviate_writer", weaviate_writer)
 
         # Connect components
-        # 1. Source -> Validator
+        # 1. Source -> Analyzer
         self.pipeline.connect("source_handler.files", "files_analyzer.input_files")
+        # 2. Analyzer -> Weaviate
+        self.pipeline.connect("files_analyzer.files", "weaviate_writer.files")
     
     def run(
         self,
@@ -118,21 +121,21 @@ class DocumentationPipeline:
                         "credentials": credentials
                     }
                 },
-                include_outputs_from={"files_analyzer"}
+                include_outputs_from={"files_analyzer", "weaviate_writer"}
             )
             
             # Extract results for report
             files = result.get("files_analyzer", {}).get("files", {})
             
             
-            # writer_result = result.get("weaviate_writer", {})
+            writer_result = result.get("weaviate_writer", {})
             # merger_result = result.get("doc_merger", {})
             # doc_creator_result = result.get("doc_creator", {})
             
             return {
                 "status": "completed",
                 "files": len(files),
-                # "documents_stored": writer_result.get("total_documents", 0),
+                "documents_stored": writer_result.get("documents_written", 0),
                 # "methods_documented": doc_creator_result.get("methods_processed", 0),
                 # "endpoints_merged": merger_result.get("endpoints_merged", 0),
                 # "swagger_path": merger_result.get("swagger_path", ""),
