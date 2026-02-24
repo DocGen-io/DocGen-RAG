@@ -2,8 +2,8 @@
 DocumentationMerger - Haystack component for merging endpoint documentation files.
 
 This component scans the output directory for individual endpoint folders,
-reads their swagger.json and postman.json files, and merges them into
-complete Swagger/OpenAPI 3.0 and Postman Collection v2.1 output files.
+reads their swagger.json files, and merges them into
+complete Swagger/OpenAPI 3.0 Collection v2.1 output files.
 """
 
 from haystack import component
@@ -25,13 +25,12 @@ logger = DocGenLogger(__name__)
 class DocumentationMerger:
     """
     Haystack component that merges individual endpoint documentation files
-    into complete Swagger and Postman Collection files.
+    into complete Swagger Collection files.
     
     Usage:
         merger = DocumentationMerger()
         result = merger.run(output_dir="output")
         print(f"Swagger: {result['swagger_path']}")
-        print(f"Postman: {result['postman_path']}")
     """
     
     def __init__(self, config_path: str = "config.yaml"):
@@ -70,7 +69,6 @@ class DocumentationMerger:
         Returns:
             Dictionary with:
                 - swagger_path: Path to generated swagger.json
-                - postman_path: Path to generated postman_collection.json
                 - endpoints_merged: Number of endpoints merged
         """
         # Use provided output_dir or default from config
@@ -101,15 +99,6 @@ class DocumentationMerger:
         ]
         
         swagger_spec = swagger_builder.build(swagger_endpoints)
-        
-     
-        postman_endpoints = [
-            {
-                "method_name": ep["method_name"],
-                "data": ep["postman_data"]
-            }
-            for ep in endpoints
-        ]
         
         # Save output files
         swagger_path = os.path.join(output_dir, "swagger.json")

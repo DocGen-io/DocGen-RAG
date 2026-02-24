@@ -27,7 +27,6 @@ from src.components.WeaviateCodeWriter import WeaviateCodeWriter
 from src.components.DocumentationCreator import DocumentationCreator
 from src.components.DocumentationMerger import DocumentationMerger
 from src.utils.config_loader import load_config
-from src.utils.output_format_builders.mapped_ast_builder import MappedAstBuilder
 from src.utils.logger import DocGenLogger
 import traceback
 from src.components.FilesAnalyzer import FilesAnalyzer
@@ -137,7 +136,6 @@ class DocumentationPipeline:
                 # "methods_documented": doc_creator_result.get("methods_processed", 0),
                 # "endpoints_merged": merger_result.get("endpoints_merged", 0),
                 # "swagger_path": merger_result.get("swagger_path", ""),
-                # "postman_path": merger_result.get("postman_path", "")
             }
             
         except Exception as e:

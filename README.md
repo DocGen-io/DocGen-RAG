@@ -1,13 +1,13 @@
 # DocGen-RAG
 
-DocGen-RAG is an AI-powered tool designed to automatically generate comprehensive API documentation from source code using Retrieval-Augmented Generation (RAG). It leverages Haystack 2.0 and Weaviate to analyze codebases and produce structured documentation including Swagger specs, Postman collections, and usage examples.
+DocGen-RAG is an AI-powered tool designed to automatically generate comprehensive API documentation from source code using Retrieval-Augmented Generation (RAG). It leverages Haystack 2.0 and Weaviate to analyze codebases and produce structured documentation including Swagger specs collections, and usage examples.
 
 ## Features
 
 - **Automated Documentation**: Generates REST API documentation from code.
 - **RAG Pipeline**: Uses knowledge injection from framework documentation and codebase indexing.
 - **Multi-Source Support**: Processes both local directories and Git repositories.
-- **Output Formats**: Generates Swagger/OpenAPI JSON, Postman Collections, and usage examples.
+- **Output Formats**: Generates Swagger/OpenAPI JSON Collections, and usage examples.
 - **Project Management**: Managed with `uv` for fast, reliable dependency management.
 
 ## Prerequisites

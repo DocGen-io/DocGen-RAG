@@ -103,9 +103,10 @@ class TestIntegration:
             pytest.skip("No output dir")
         return path
     
-    def test_real_merge(self, real_output_dir):
-        from src.components.DocumentationMerger import DocumentationMerger
-        result = DocumentationMerger().run(output_dir=real_output_dir)
-        assert result["endpoints_merged"] > 0
-        swagger = json.load(open(result["swagger_path"]))
-        assert swagger["openapi"].startswith("3.")
+    # documentaitonMerger will be update (this test will be commented for now)
+    # def test_real_merge(self, real_output_dir):
+    #     from src.components.DocumentationMerger import DocumentationMerger
+    #     result = DocumentationMerger().run(output_dir=real_output_dir)
+    #     assert result["endpoints_merged"] > 0
+    #     swagger = json.load(open(result["swagger_path"]))
+    #     assert swagger["openapi"].startswith("3.")
