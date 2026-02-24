@@ -8,13 +8,14 @@ file_analyzer_prompt = Template("""
         1. OUTPUT ONLY RAW JSON. No markdown backticks.
         2. ALWAYS include the "dependencies" array. If none, return [].
         3. If a method is NOT an API endpoint, set "is_api_method" to null.
+        4. ALWAYS structure the output with a top-level "file_path" and a "content" array. EVERY extracted component (classes, functions, interfaces, schemas, dtos, etc.) MUST be an object INSIDE the "content" array. Do NOT output single objects without the "content" wrapper.
 
         ### JSON SCHEMA
         { 
             "file_path": "str",
             "content": [
                 {
-                    "type": "class | function | schema",
+                    "type": "class | function | schema | interface | dto",
                     "name": "str",
                     "start_line": int,
                     "end_line": int,

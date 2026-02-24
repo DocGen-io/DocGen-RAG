@@ -82,7 +82,7 @@ class FilesAnalyzer:
         
         return json_output
 
-    def analyze_files(self, input_files: Dict[str, List[str]])-> Dict[str, Dict[str,Any]]:
+    def analyze_files(self, input_files: Dict[str, List[str]])-> List[Dict[str,Any]]:
         results = {}
         start_time = time.time()
 
@@ -116,8 +116,13 @@ class FilesAnalyzer:
                             for item in result['content']:
                                 start_line = item.get('start_line')
                                 end_line = item.get('end_line')
-                                if start_line is not None and end_line is not None:
-                                    item['lines'] = self.get_exact_lines(fp, start_line, end_line)
+                                item['lines'] = self.get_exact_lines(fp, start_line, end_line)
+
+                        # if no content (data-model or interface)
+                        else:
+                            
+                            result['lines'] = self.get_exact_lines(fp, result.get('start_line'), result.get('end_line'))
+                            
 
                         self._save_analyzer_output(fp, result)
 
@@ -126,9 +131,8 @@ class FilesAnalyzer:
         
         end_time = time.time()
         logger.info(f"Analyzed {len(results)} files in {end_time - start_time:.2f}s")
-
         
-        return results
+        return list(results.values())
       
     
     def _save_analyzer_output(self, file_path: str, result: Dict[str, Any]) -> None:
@@ -152,6 +156,8 @@ class FilesAnalyzer:
     # get exact lines from files using start_line and end_line
     def get_exact_lines(self, file_path: str, start_line: int, end_line: int) -> List[str]:
         """Gets exact lines from a file using start_line and end_line."""
+        if start_line is None or end_line is None:
+            return None
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 return [line for i, line in enumerate(f) if start_line <= i+1 <= end_line]
@@ -160,7 +166,7 @@ class FilesAnalyzer:
             return None
         
     @component.output_types(
-       files=List[Dict[str, List[str]]],
+       files=List[Dict[str, Any]],
     )
     def run(self, input_files: List[Dict[str, str]]):
         

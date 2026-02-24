@@ -43,14 +43,14 @@ def load_json_folder(folder_path: str) -> List[Dict[str, Any]]:
     Load all JSON files from a folder.
     
     Returns a list of dicts, each containing:
-    - file_name: The filename of the JSON file
-    - data: The parsed JSON content
+    - file_path: The filename of the JSON file
+    - content: The parsed JSON content
     
     Args:
         folder_path: Path to folder containing JSON files
         
     Returns:
-        List of dictionaries with file_name and data
+        List of dictionaries with file_path and content
     """
     json_files = []
     
@@ -67,10 +67,14 @@ def load_json_folder(folder_path: str) -> List[Dict[str, Any]]:
             filepath = os.path.join(folder_path, filename)
             data = load_json_file(filepath)
             if data is not None:
-                json_files.append({
-                    'file_name': filename,
-                    'data': data
-                })
+                # Prevent double-wrapping if the data already matches the schema
+                if isinstance(data, dict) and 'content' in data and 'file_path' in data:
+                    json_files.append(data)
+                else:
+                    json_files.append({
+                        'file_path': filepath,
+                        'content': data
+                    })
     
     logger.info(f"Loaded {len(json_files)} JSON files from {folder_path}")
     return json_files
@@ -90,8 +94,8 @@ def flatten_ast_methods(ast_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     methods = []
     
     for file_info in ast_data:
-        file_name = file_info.get('file_name', 'unknown')
-        data = file_info.get('data', [])
+        file_name = file_info.get('file_path', 'unknown')
+        data = file_info.get('content', [])
         
         # Handle both array and single object formats
         classes = data if isinstance(data, list) else [data]
