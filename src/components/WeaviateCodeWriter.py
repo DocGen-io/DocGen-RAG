@@ -132,8 +132,6 @@ class WeaviateCodeWriter:
         
         if not files:
             logger.warning("No files provided to write")
-
-            files = load_json_folder(analyzer_output)
             
         # Process to documents
         documents = self.analyzed_files_to_documents(files)

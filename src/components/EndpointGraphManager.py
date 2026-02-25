@@ -90,6 +90,42 @@ class EndpointGraphManager:
         except Exception as e:
             logger.error(f"Failed to delete dependency from DB: {e}")
             return False
+
+    def get_affected_endpoints(self, changed_dependencies: List[str]) -> List[str]:
+        """
+        Retrieves all API endpoints that are affected by a change in one or more dependencies.
+        It runs an efficient SQL query to find any endpoint where the changed dependency 
+        appears as either a caller or a target.
+        """
+        if not changed_dependencies:
+            return []
+            
+        affected_endpoints = set()
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Parameterized query placeholders
+                placeholders = ','.join(['?'] * len(changed_dependencies))
+                
+                query = f'''
+                    SELECT DISTINCT endpoint_id 
+                    FROM dependencies 
+                    WHERE caller IN ({placeholders}) OR target IN ({placeholders})
+                '''
+                
+                # Parameters are repeated twice: once for caller, once for target
+                params = changed_dependencies * 2
+                
+                cursor.execute(query, params)
+                
+                for row in cursor.fetchall():
+                    affected_endpoints.add(row[0])
+                    
+        except Exception as e:
+            logger.error(f"Failed to query affected endpoints from DB: {e}")
+            
+        return list(affected_endpoints)
             
     def _clear_endpoint_db(self, endpoint_id: str):
         """Clear all previous DB entries for a given endpoint before full rebuild."""
