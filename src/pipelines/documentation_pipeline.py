@@ -24,6 +24,7 @@ import json
 from src.components.SourceHandler import SourceHandler
 from src.components.FrameworkValidator import FrameworkValidator
 from src.components.WeaviateCodeWriter import WeaviateCodeWriter
+from src.components.FileHasher import FileHasher
 from src.components.DocumentationCreator import DocumentationCreator
 from src.components.DocumentationMerger import DocumentationMerger
 from src.utils.config_loader import load_config
@@ -81,21 +82,26 @@ class DocumentationPipeline:
         #     config_path=self.config_path
         # )
         # doc_merger = DocumentationMerger(self.config_path)
+        file_hasher = FileHasher()
         files_analyzer = FilesAnalyzer()
         graph_manager = EndpointGraphManager()
         
         # Add components
         self.pipeline.add_component("source_handler", source_handler)
+        self.pipeline.add_component("file_hasher", file_hasher)
         self.pipeline.add_component("files_analyzer", files_analyzer)
         self.pipeline.add_component("weaviate_writer", weaviate_writer)
         self.pipeline.add_component("graph_manager", graph_manager)
 
         # Connect components
-        # 1. Source -> Analyzer
-        self.pipeline.connect("source_handler.files", "files_analyzer.input_files")
-        # 2a. Analyzer -> GraphManager
+        # 1. Source -> Hasher
+        self.pipeline.connect("source_handler.files", "file_hasher.files")
+        self.pipeline.connect("source_handler.working_dir", "file_hasher.working_dir")
+        # 2. Hasher -> Analyzer
+        self.pipeline.connect("file_hasher.files", "files_analyzer.input_files")
+        # 3a. Analyzer -> GraphManager
         self.pipeline.connect("files_analyzer.files", "graph_manager.analyzed_files")
-        # 2b. Analyzer -> Weaviate
+        # 3b. Analyzer -> Weaviate
         self.pipeline.connect("files_analyzer.files", "weaviate_writer.files")
     
     def run(
