@@ -101,100 +101,84 @@ Set the following environment variables (e.g., in a `.env` file or export them):
 graph TD
 
     %% Compare
-    SL{"Is Supported Language!"}
-    SF{"Is Supported Framework!"}
     HE{"Hash Exists!"}
     
     %% Stop
     SFF{{"Stop for this file!"}}
-   %% Stop(["Error: Not a REST API"])
 
-
-    %% Error
-    Error(["Stop & Log Error"])
-
-
-    %%  Input Sources
+    %% Input Sources
     Input1(["Local Codebase Folder"])
     Input2(["GitHub Repo URL"])
 
     SH["Source Handler"]
-    %% 2-3. Processing
-    LF["Language Finder"]
-    FD["Framework Detector (Using AST Queries)"]
-    DF("Dependency Finder")
+    
+    %% Processing
     FH("File Hasher")
-    DS[(" Vectorization Weaviate Storage")]
-    AST["AST Extractor"]
-    CM["Code Mapper"]
+    SQLL[("Simple SQL DATABASE")]
+    DS[("Vectorization Weaviate Storage")]
+    EGM["Endpoint Graph Manager"]
+    FA["File Analyzer"]
     EGR["Endpoint Documentation Generator"]
     DM["Documentation Merger"]
 
+    Output("Documentation as Json Output")
 
-    Output("Docuemntation as Json Output")
-
- 
-    
-   
-
-
-    %% Connections
+    %% ==========================================
+    %% 1. PRIMARY DOWNWARD FLOW 
+    %% (Defining this first forces a clean vertical hierarchy)
+    %% ==========================================
     Input1 --> SH
     Input2 --> SH
-    SH --> LF
-    LF --> SL
-    SL -- No --> Error
-    SL -- Yes --> FD
-    FD --> SF
-    SF -- No --> Error
-    SF -- Yes --> DF
-    DF -- List OF Deps --> FH
-    FH -- Compare With Store --> DS
-    DS --> HE
-    HE -- Yes --> SFF
-    HE -- NO --> AST
-    AST -- To be mapped --> CM
-    AST -- To be saved --> DS
-    CM -- Map --> DS
-    DS -- Get Saved Map --> CM
-    DS --> EGR
+    SH --> FH
+    FH -- Compare with Key/Value Store --> SQLL
+    SQLL --> HE
+    HE -- NO --> FA
+    FA -- Update Graph and Indicate changes for each endpoint --> EGM
+    EGM --> EGR
     EGR --> DM
     DM --> Output
 
+    %% ==========================================
+    %% 2. SIDE BRANCHES
+    %% ==========================================
+    HE -- Yes --> SFF
+    FA -- Save Code chunks --> DS
+    DS --> EGR
 
-      
-  %% Inputs: Deep Navy/Slate
-  style Input1 fill:#2c3e50,stroke:#5dade2,stroke-width:2px,color:#fff
-  style Input2 fill:#2c3e50,stroke:#5dade2,stroke-width:2px,color:#fff
-  style SH     fill:#34495e,stroke:#5dade2,stroke-width:1px,color:#fff
+    %% ==========================================
+    %% 3. LOOPBACKS (Extended Links)
+    %% (Using ---> prevents the layout from tangling)
+    %% ==========================================
+    EGR -- Save documentation info (vectorized) ---> DS
+    EGM -- Save Graphs ---> SQLL
 
-  %% Logic/Analyzers: Sage/Forest
-  style LF     fill:#2d5a27,stroke:#a9dfbf,stroke-width:1px,color:#fff
-  style FD     fill:#2d5a27,stroke:#a9dfbf,stroke-width:1px,color:#fff
-  style DF     fill:#2d5a27,stroke:#a9dfbf,stroke-width:1px,color:#fff
-  style AST    fill:#2d5a27,stroke:#a9dfbf,stroke-width:1px,color:#fff
-  style CM     fill:#2d5a27,stroke:#a9dfbf,stroke-width:1px,color:#fff
+    %% ==========================================
+    %% STYLES
+    %% ==========================================
+    %% Inputs: Deep Navy/Slate
+    style Input1 fill:#2c3e50,stroke:#5dade2,stroke-width:2px,color:#fff
+    style Input2 fill:#2c3e50,stroke:#5dade2,stroke-width:2px,color:#fff
+    style SH     fill:#34495e,stroke:#5dade2,stroke-width:1px,color:#fff
 
-  %% Decisions: Muted Amber/Gold (High visibility for logic gates)
-  style SL     fill:#7d6608,stroke:#f1c40f,stroke-width:2px,color:#fff
-  style SF     fill:#7d6608,stroke:#f1c40f,stroke-width:2px,color:#fff
-  style HE     fill:#7d6608,stroke:#f1c40f,stroke-width:2px,color:#fff
+    %% Logic/Analyzers: Sage/Forest
+    style FA     fill:#2d5a27,stroke:#a9dfbf,stroke-width:1px,color:#fff
 
-  %% Processing/Storage: Deep Purple/Indigo
-  style FH     fill:#4a235a,stroke:#a569bd,stroke-width:1px,color:#fff
-  style DS     fill:#1b2631,stroke:#5dade2,stroke-width:2px,color:#fff
-  style EGR    fill:#4a235a,stroke:#a569bd,stroke-width:1px,color:#fff
-  style DM     fill:#4a235a,stroke:#a569bd,stroke-width:1px,color:#fff
+    %% Decisions: Muted Amber/Gold
+    style HE     fill:#7d6608,stroke:#f1c40f,stroke-width:2px,color:#fff
 
-  %% Errors & Stops: Muted Crimson
-  style SFF    fill:#641e16,stroke:#ec7063,stroke-width:2px,color:#fff
-  style Error  fill:#641e16,stroke:#ec7063,stroke-width:2px,color:#fff
+    %% Processing/Management: Deep Purple/Indigo
+    style FH     fill:#4a235a,stroke:#a569bd,stroke-width:1px,color:#fff
+    style EGM    fill:#4a235a,stroke:#a569bd,stroke-width:1px,color:#fff
+    style EGR    fill:#4a235a,stroke:#a569bd,stroke-width:1px,color:#fff
+    style DM     fill:#4a235a,stroke:#a569bd,stroke-width:1px,color:#fff
 
- style Output fill:#0e6251,stroke:#1abc9c,stroke-width:2px,color:#fff
-    
-    
-  
+    %% Storage: Dark Navy
+    style SQLL   fill:#1b2631,stroke:#5dade2,stroke-width:2px,color:#fff
+    style DS     fill:#1b2631,stroke:#5dade2,stroke-width:2px,color:#fff
 
+    %% Errors & Stops: Muted Crimson
+    style SFF    fill:#641e16,stroke:#ec7063,stroke-width:2px,color:#fff
 
-
+    %% Outputs: Deep Teal
+    style Output fill:#0e6251,stroke:#1abc9c,stroke-width:2px,color:#fff
 ```
