@@ -1,144 +1,76 @@
 """
-Unit tests for DocumentationCreator component.
+Unit tests for DocumentationCreator component handling EndpointGraphManager inputs.
 """
 
 import pytest
 import json
 import os
 import tempfile
-import shutil
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch, call
 from haystack.dataclasses import Document
+from src.components.DocumentationCreator import DocumentationCreator
+from src.utils.dependency_graph import DependencyGraph
+from src.utils.llm_json_handler import LLMJsonHandler
 
+class TestDocumentationCreatorInput:
+    """Test how DocumentationCreator handles its new inputs."""
 
-class TestDocumentationCreatorFiltering:
-    """Tests for API method filtering logic."""
+    def test_run_with_no_graphs(self):
+        with patch.object(DocumentationCreator, '__init__', lambda self: None):
+            creator = DocumentationCreator()
+            creator.output_dir = "temp"
+            result = creator.run(endpoint_graphs={})
+            assert result["methods_processed"] == 0
+            assert result["methods_failed"] == 0
+            assert result["output_files"] == {}
+
+class TestDocumentationCreatorContextFetching:
+    """Tests for traversing EndpointGraphs and fetching from Weaviate."""
     
-    def test_filter_api_methods_returns_only_api_routes(self):
-        """Verify only methods with is_api_route=true are returned."""
-        from src.utils.json_loader import flatten_ast_methods
+    @patch('src.components.DocumentationCreator.fetch_by_node_id')
+    def test_graph_traversal_and_fetching(self, mock_fetch):
+        # Create a mock DependencyGraph
+        graph = DependencyGraph("controller.ts:TestController:myEndpoint")
+        graph.add_dependency("controller.ts:TestController:myEndpoint", "service.ts:TestService:findAll")
         
-        ast_data = [{
-            "file_name": "test.controller.ts.json",
-            "data": [{
-                "class_name": "TestController",
-                "class_type": "Controller",
-                "base_path": "/api",
-                "methods": [
-                    {
-                        "method_name": "constructor",
-                        "is_api_route": False,
-                        "method_definition": "constructor() {}"
-                    },
-                    {
-                        "method_name": "getAll",
-                        "is_api_route": True,
-                        "method_type": "Get",
-                        "method_path": "",
-                        "method_definition": "getAll() { return []; }"
-                    },
-                    {
-                        "method_name": "helperMethod",
-                        "is_api_route": False,
-                        "method_definition": "helperMethod() {}"
-                    },
-                    {
-                        "method_name": "getById",
-                        "is_api_route": True,
-                        "method_type": "Get",
-                        "method_path": ":id",
-                        "method_definition": "getById(id) { return {}; }"
-                    }
-                ]
-            }]
-        }]
+        # Mock Weaviate documents
+        def side_effect_fetch(store, node_id):
+            if node_id == "controller.ts:TestController:myEndpoint":
+                return [Document(content="Controller Code", meta={"name": "myEndpoint", "type": "method", "api_method_details": '{"method": "myEndpoint", "method_type": "GET", "method_path": "/api", "base_path": "/test"}'})]
+            elif node_id == "service.ts:TestService:findAll":
+                return [Document(content="Service Code", meta={"name": "findAll"})]
+            return []
+            
+        mock_fetch.side_effect = side_effect_fetch
         
-        all_methods = flatten_ast_methods(ast_data)
-        api_methods = [m for m in all_methods if m.get("is_api_route") is True]
-        
-        assert len(api_methods) == 2
-        assert api_methods[0]["method_name"] == "getAll"
-        assert api_methods[1]["method_name"] == "getById"
-    
-    def test_filter_api_methods_with_no_api_routes(self):
-        """Verify empty list when no API routes exist."""
-        from src.utils.json_loader import flatten_ast_methods
-        
-        ast_data = [{
-            "file_name": "service.ts.json",
-            "data": [{
-                "class_name": "TestService",
-                "methods": [
-                    {
-                        "method_name": "doSomething",
-                        "is_api_route": False,
-                        "method_definition": "doSomething() {}"
-                    }
-                ]
-            }]
-        }]
-        
-        all_methods = flatten_ast_methods(ast_data)
-        api_methods = [m for m in all_methods if m.get("is_api_route") is True]
-        
-        assert len(api_methods) == 0
-
-
-class TestWeaviateFilterQuery:
-    """Tests for Weaviate filter construction."""
-    
-    def test_fetch_by_method_name_filter_structure(self):
-        """Verify correct filter structure for exact method name match."""
-        from src.utils.weaviate_utils import fetch_by_method_name
-        
-        mock_store = Mock()
-        mock_store.filter_documents.return_value = []
-        
-        fetch_by_method_name(mock_store, "findById")
-        
-        # Check the filter was called with correct structure
-        mock_store.filter_documents.assert_called_once()
-        call_args = mock_store.filter_documents.call_args
-        filters = call_args.kwargs.get("filters") or call_args[1].get("filters")
-        
-        assert filters["operator"] == "AND"
-        assert len(filters["conditions"]) == 2
-        
-        # Check type condition
-        type_condition = filters["conditions"][0]
-        assert type_condition["field"] == "meta.type"
-        assert type_condition["operator"] == "=="
-        assert type_condition["value"] == "ast_method"
-        
-        # Check method_name condition
-        name_condition = filters["conditions"][1]
-        assert name_condition["field"] == "meta.method_name"
-        assert name_condition["operator"] == "=="
-        assert name_condition["value"] == "findById"
-    
-    def test_fetch_by_method_name_returns_documents(self):
-        """Verify documents are returned from Weaviate query."""
-        from src.utils.weaviate_utils import fetch_by_method_name
-        
-        mock_doc = Document(content="test content", meta={"method_name": "findById"})
-        mock_store = Mock()
-        mock_store.filter_documents.return_value = [mock_doc]
-        
-        result = fetch_by_method_name(mock_store, "findById")
-        
-        assert len(result) == 1
-        assert result[0].content == "test content"
-
+        with patch.object(DocumentationCreator, '__init__', lambda self: None):
+            creator = DocumentationCreator()
+            creator.document_store = Mock()
+            creator.generator = Mock()
+            creator.output_dir = "temp"
+            
+            with patch.object(LLMJsonHandler, 'parse_with_retry', return_value={"swagger": {"summary": "test"}}):
+                with patch.object(creator, '_save_outputs', return_value={"swagger": "path/file.json"}):
+                    result = creator.run(endpoint_graphs={"controller.ts:TestController:myEndpoint": graph})
+                    
+                    assert result["methods_processed"] == 1
+                    
+                    # Verify `fetch_by_node_id` was queried for the controller and the service
+                    assert mock_fetch.call_count == 3
+                    
+                    calls = [
+                        call(creator.document_store, "controller.ts:TestController:myEndpoint"),
+                        call(creator.document_store, "service.ts:TestService:findAll"),
+                        call(creator.document_store, "controller.ts:TestController:myEndpoint")
+                    ]
+                    # order may not be strictly guaranteed as get_all_nodes() uses sets
+                    mock_fetch.assert_has_calls(calls, any_order=True)
 
 class TestOutputFileStructure:
     """Tests for output directory and file creation."""
     
     def test_save_outputs_creates_directory_structure(self):
-        """Verify correct directory and file creation."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            from src.components.DocumentationCreator import DocumentationCreator
-            
-            # Mock the component initialization
             with patch.object(DocumentationCreator, '__init__', lambda self: None):
                 creator = DocumentationCreator()
                 creator.output_dir = tmpdir
@@ -149,82 +81,27 @@ class TestOutputFileStructure:
                 
                 saved = creator._save_outputs("testMethod", documentation)
                 
-                # Check directory was created
                 method_dir = os.path.join(tmpdir, "testMethod")
                 assert os.path.isdir(method_dir)
-                
-                # Check files were created
                 assert os.path.exists(saved["swagger"])
                 
-            
                 with open(saved["swagger"]) as f:
                     swagger_data = json.load(f)
                     assert swagger_data["summary"] == "Test endpoint"
 
-
-class TestJsonFormat:
-    """Tests for valid JSON output format."""
-    
-    def test_swagger_json_is_valid_openapi_structure(self):
-        """Verify Swagger output has OpenAPI-like structure."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            from src.components.DocumentationCreator import DocumentationCreator
-            
-            with patch.object(DocumentationCreator, '__init__', lambda self: None):
-                creator = DocumentationCreator()
-                creator.output_dir = tmpdir
-                
-                documentation = {
-                    "swagger": {
-                        "summary": "Get all posts",
-                        "description": "Retrieves all blog posts",
-                        "parameters": [],
-                        "responses": {
-                            "200": {"description": "Success"}
-                        }
-                    }
-                }
-                
-                saved = creator._save_outputs("getAllPosts", documentation)
-                
-                with open(saved["swagger"]) as f:
-                    data = json.load(f)
-                    assert "summary" in data
-                    assert "responses" in data
-
-
-class TestGetDependenciesForMethod:
-    """Tests for dependency extraction from mapped_ast."""
-    
-    def test_get_dependencies_returns_correct_list(self):
-        """Verify correct dependencies are extracted for a method."""
-        from src.components.DocumentationCreator import DocumentationCreator
+class TestWeaviateFilterQuery:
+    """Test fetch_by_node_id utility."""
+    def test_fetch_by_node_id_filter_structure(self):
+        from src.utils.weaviate_utils import fetch_by_node_id
+        mock_store = Mock()
+        mock_store.filter_documents.return_value = []
         
-        with patch.object(DocumentationCreator, '__init__', lambda self: None):
-            creator = DocumentationCreator()
-            
-            mapped_ast = {
-                "PostController": {
-                    "methods": [
-                        {"method": "getAllPosts", "dependencies": ["postService.findAll"]},
-                        {"method": "getPostById", "dependencies": ["postService.findById"]}
-                    ]
-                }
-            }
-            
-            deps = creator._get_dependencies_for_method("PostController", "getAllPosts", mapped_ast)
-            
-            assert deps == ["postService.findAll"]
-    
-    def test_get_dependencies_returns_empty_for_missing_method(self):
-        """Verify empty list for non-existent method."""
-        from src.components.DocumentationCreator import DocumentationCreator
+        fetch_by_node_id(mock_store, "testNode:Origin:Name")
         
-        with patch.object(DocumentationCreator, '__init__', lambda self: None):
-            creator = DocumentationCreator()
-            
-            mapped_ast = {"SomeController": {"methods": []}}
-            
-            deps = creator._get_dependencies_for_method("PostController", "unknownMethod", mapped_ast)
-            
-            assert deps == []
+        mock_store.filter_documents.assert_called_once()
+        call_args = mock_store.filter_documents.call_args
+        filters = call_args.kwargs.get("filters") or call_args[1].get("filters")
+        
+        assert filters["field"] == "meta.node_id"
+        assert filters["operator"] == "=="
+        assert filters["value"] == "testNode:Origin:Name"

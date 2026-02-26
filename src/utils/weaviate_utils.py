@@ -76,3 +76,31 @@ def fetch_by_class_name(
     except Exception as e:
         logger.error(f"Error fetching documents for class {class_name}: {e}")
         return []
+
+def fetch_by_node_id(
+    document_store: WeaviateDocumentStore,
+    node_id: str
+) -> List[Document]:
+    """
+    Query Weaviate for documents matching exact composite node ID.
+    
+    Args:
+        document_store: WeaviateDocumentStore instance
+        node_id: Exact node_id to search for (format: file_name:origin:name)
+        
+    Returns:
+        List of matching Document objects
+    """
+    filters = {
+        "field": "meta.node_id",
+        "operator": "==",
+        "value": node_id
+    }
+    
+    try:
+        documents = document_store.filter_documents(filters=filters)
+        logger.debug(f"Found {len(documents)} documents for node_id: {node_id}")
+        return documents
+    except Exception as e:
+        logger.error(f"Error fetching documents for node_id {node_id}: {e}")
+        return []

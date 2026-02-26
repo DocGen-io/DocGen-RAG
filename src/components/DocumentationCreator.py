@@ -5,23 +5,20 @@ This component analyzes code_mapper output, fetches dependency information from 
 and uses LLM to generate comprehensive API documentation in Swagger formats.
 """
 
-from haystack import component
-from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
-from typing import Dict, Any, List, Optional
-import json
 import os
+import json
 from string import Template
-
-from src.utils.modelGenerator import ModelGenerator
-from src.utils.json_loader import load_json_file
-from src.utils.weaviate_utils import fetch_by_method_name
-from src.utils.llm_json_handler import LLMJsonHandler
-from src.utils.config_loader import load_config
+from haystack import component
 from src.utils.logger import DocGenLogger
+from typing import Dict, Any, List, Optional
+from src.utils.config_loader import load_config
+from src.utils.llm_json_handler import LLMJsonHandler
+from src.utils.weaviate_utils import fetch_by_node_id
+from src.utils.dependency_graph import DependencyGraph
+from src.utils.modelGenerator import ModelGenerator
 from prompts import doc_creator_prompt as DOCUMENTATION_PROMPT
+from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
 logger = DocGenLogger(__name__)
-
-
 
 
 @component
@@ -45,54 +42,21 @@ class DocumentationCreator:
         # Initialize Weaviate document store
         self.document_store = WeaviateDocumentStore(url=weaviate_url)
     
-    def _get_api_methods(self, mapped_ast: Dict) -> List[Dict]:
-        """Filter methods where is_api_route=true from mapped_ast."""
-        api_methods = []
-        for class_name, class_data in mapped_ast.items():
-            for method_info in class_data.get("methods", []):
-                if method_info.get("is_api_route") is True:
-                    api_methods.append({
-                        "class_name": class_name,
-                        "method_name": method_info.get("method"),
-                        "dependencies": method_info.get("dependencies", [])
-                    })
-        logger.info(f"Found {len(api_methods)} API methods in mapped_ast")
-        return api_methods
-    
-    def _get_dependencies_for_method(
-        self,
-        class_name: str,
-        method_name: str,
-        mapped_ast: Dict
-    ) -> List[str]:
-        """Get the list of dependencies for a method from mapped_ast."""
-        class_data = mapped_ast.get(class_name, {})
-        methods = class_data.get("methods", [])
-        
-        for method_info in methods:
-            if method_info.get("method") == method_name:
-                return method_info.get("dependencies", [])
-        return []
-    
-    def _fetch_dependency_context(self, dependencies: List[str]) -> str:
-        """Fetch dependency information from Weaviate and format as context."""
-        if not dependencies:
+    def _fetch_dependency_context(self, node_ids: List[str]) -> str:
+        """Fetch code context from Weaviate for a list of node IDs."""
+        if not node_ids:
             return "No internal dependencies identified."
         
         context_parts = []
-        for dep in dependencies:
-            # Extract method name from dependency (e.g., "postService.findAll" -> "findAll")
-            parts = dep.split(".")
-            method_name = parts[-1] if parts else dep
-            
-            # Fetch from Weaviate
-            docs = fetch_by_method_name(self.document_store, method_name)
+        for node_id in node_ids:
+            # Fetch from Weaviate using composite ID
+            docs = fetch_by_node_id(self.document_store, node_id)
             
             if docs:
                 doc = docs[0]
-                context_parts.append(f"**{dep}**:\n{doc.content}\n")
+                context_parts.append(f"**{node_id}**:\n{doc.content}\n")
             else:
-                context_parts.append(f"**{dep}**: No additional context available.\n")
+                context_parts.append(f"**{node_id}**: No additional context available.\n")
         
         return "\n".join(context_parts) if context_parts else "No dependency context found."
     
@@ -183,62 +147,21 @@ class DocumentationCreator:
     )
     def run(
         self,
-        mapped_ast_path: str = "mapped_ast.json",
-        mapped_ast: Optional[Dict[str, Any]] = None,
-        ast_data: Optional[List[Dict[str, Any]]] = None
+        endpoint_graphs: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        Process mapped AST and generate API documentation.
+        Process EndpointGraphs, fetch code context, and generate API documentation.
         
         Args:
-            mapped_ast_path: Path to mapped_ast.json file
-            ast_folder: Optional, path to AST folder (used for additional context)
-            mapped_ast: Optional in-memory mapped AST dictionary
-            ast_data: Optional in-memory AST data list
+            endpoint_graphs: Dictionary mapping endpoint_id to DependencyGraph objects
             
         Returns:
             Dictionary with processing results
         """
         logger.info(f"Starting DocumentationCreator")
         
-        # Load mapped_ast: Use in-memory if provided
-        mapped_ast_data = {}
-        if mapped_ast:
-             logger.info("Using provided in-memory mapped AST")
-             mapped_ast_data = mapped_ast
-        else:
-             logger.info(f"Loading mapped AST from: {mapped_ast_path}")
-             mapped_ast_data = load_json_file(mapped_ast_path) or {}
-        
-        # Load AST data
-        ast_data_list = []
-        if ast_data:
-             logger.info(f"Using provided in-memory AST data ({len(ast_data)} files)")
-             ast_data_list = ast_data
-        
-
-
-        # Build lookup for method details from AST
-        method_details = {}
-        for ast_file in ast_data_list:
-            for file_data in ast_file.get("data", [ast_file]):
-                for cls in (file_data if isinstance(file_data, list) else [file_data]):
-                    class_name = cls.get("class_name", "")
-                    base_path = cls.get("base_path", "/")
-                    for method in cls.get("methods", []):
-                        key = f"{class_name}.{method.get('method_name')}"
-                        method_details[key] = {
-                            "method_definition": method.get("method_definition", ""),
-                            "method_type": method.get("method_type", "GET"),
-                            "method_path": method.get("method_path", ""),
-                            "base_path": base_path
-                        }
-        
-        # Get API methods from mapped_ast
-        api_methods = self._get_api_methods(mapped_ast_data)
-        
-        if not api_methods:
-            logger.warning("No API methods found to document")
+        if not endpoint_graphs:
+            logger.warning("No endpoint graphs found to document")
             return {
                 "methods_processed": 0,
                 "methods_failed": 0,
@@ -250,39 +173,63 @@ class DocumentationCreator:
         methods_failed = 0
         output_files = {}
         
-        for method in api_methods:
-            method_name = method.get("method_name", "unknown")
-            class_name = method.get("class_name", "Unknown")
-            
-            logger.info(f"Processing: {class_name}.{method_name}")
+        for endpoint_id, graph in endpoint_graphs.items():
+            logger.info(f"Processing endpoint graph: {endpoint_id}")
             
             try:
-                # Get dependencies already included in method from _get_api_methods
-                dependencies = method.get("dependencies", [])
+                # 1. Gather all nodes involved in this endpoint (including the endpoint itself)
+                node_ids = list(graph.get_all_nodes())
                 
-                # Enrich method with details from AST
-                key = f"{class_name}.{method_name}"
-                if key in method_details:
-                    method.update(method_details[key])
+                # 2. Fetch context from Weaviate for all nodes
+                dep_context = self._fetch_dependency_context(node_ids)
                 
-                # Fetch dependency context from Weaviate
-                dep_context = self._fetch_dependency_context(dependencies)
+                # 3. Extract the endpoint method's details from Weaviate to guide the prompt
+                endpoint_doc_list = fetch_by_node_id(self.document_store, endpoint_id)
+                if not endpoint_doc_list:
+                    logger.error(f"Endpoint {endpoint_id} not found in Weaviate. Skipping.")
+                    methods_failed += 1
+                    continue
+                    
+                endpoint_doc = endpoint_doc_list[0]
+                meta = endpoint_doc.meta
                 
-                # Build prompt and generate documentation
-                prompt = self._build_prompt(method, dep_context)
-                documentation = self._generate_documentation(prompt, method)
+                api_details_str = meta.get("api_method_details", "{}")
+                try:
+                    if isinstance(api_details_str, str):
+                        api_details = json.loads(api_details_str)
+                    else:
+                        api_details = api_details_str
+                except Exception:
+                    api_details = {}
+                
+                if not isinstance(api_details, dict):
+                    api_details = {}
+                    
+                method_info = {
+                    "class_name": meta.get("class_name", endpoint_id.split(":")[1] if len(endpoint_id.split(":")) > 1 else "Unknown"),
+                    "method_name": meta.get("name", endpoint_id.split(":")[2] if len(endpoint_id.split(":")) > 2 else "unknown"),
+                    "method_type": api_details.get("method_type", "GET"),
+                    "method_path": api_details.get("method_path", "/"),
+                    "base_path": api_details.get("base_path", "/"),
+                    "method_definition": endpoint_doc.content
+                }
+                
+                # 4. Build prompt and generate
+                prompt = self._build_prompt(method_info, dep_context)
+                documentation = LLMJsonHandler.parse_with_retry(generator=self.generator, prompt=prompt,max_retries=3)
                 
                 if documentation:
+                    method_name = method_info.get("method_name", "unknown")
                     # Save output files
                     saved = self._save_outputs(method_name, documentation)
                     output_files[method_name] = saved
                     methods_processed += 1
                 else:
-                    logger.error(f"Failed to generate docs for {method_name}")
+                    logger.error(f"Failed to generate docs for {endpoint_id}")
                     methods_failed += 1
                     
             except Exception as e:
-                logger.error(f"Error processing {class_name}.{method_name}: {e}")
+                logger.error(f"Error processing {endpoint_id}: {e}")
                 methods_failed += 1
         
         result = {
