@@ -33,7 +33,11 @@ file_analyzer_prompt = Template("""
 
         ### EXTRACTION RULES (CRITICAL)
         - **Extract EVERY Method:** Do NOT abbreviate or collapse an entire Controller/Service into a single JSON block. You MUST create a separate JSON object in the `content` array for EACH individual method inside the class.
-        - **API Endpoints:** If a method has routing decorators (`@Get`, `@Post`), fill `is_api_method` with the method type and the FULL path (combine Controller path + Method path).
+        - **API Endpoints (CRITICAL LIMITATION):** ONLY extract an item as an API Endpoint (i.e. `is_api_method` is NOT null) if it is an ACTUAL METHOD decorated with a specific HTTP verb (e.g. `@Get`, `@Post`, `@Put`, `@Delete`, `@Patch`). 
+        - **MULTIPLE DECORATORS:** A method IS an API endpoint if it has an HTTP verb decorator, EVEN IF it also has other decorators (e.g., `@GrpcMethod`, `@UseGuards`). Never ignore the HTTP decorator.
+        - **FORBIDDEN ENDPOINTS:** You MUST NEVER mark a Class, a `@Module`, or a `@Controller` itself as an API endpoint. A `@Controller` merely groups methods; the METHODS inside are the endpoints. For ANY class, `is_api_method` MUST be null.
+        - **BASE PATH:** Look for a class-level decorator like `@Controller('users')` or `@Route('/api')`. This defines the Base Path.
+        - **API Path Combination:** For valid API methods, fill `is_api_method` with the method type and the STRICTLY COMBINED FULL path (Base Path + Method path). For example, if class is `@Controller('auth')` and method is `@Post('signup')`, the path MUST be `/auth/signup`. Ensure properly formatted slashes.
         - **Executable Business Logic ONLY:** ONLY extract dependencies that are ACTUAL METHOD CALLS to internal services, repositories, or models. 
         - **FORBIDDEN EXTRACTIONS:** DO NOT extract imports, Enums (e.g., `RoleType`), Type Definitions (e.g., `ConfigType<typeof X>`), Interfaces, or property access. 
         - **Self-Referential `this`:** If a method calls another method/property on the same class (e.g., `this.password()`), the `dependency_origin` MUST be the name of the ENCLOSING CLASS (e.g., "User", NOT "this").

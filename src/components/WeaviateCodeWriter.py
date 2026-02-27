@@ -10,6 +10,7 @@ from src.utils.logger import DocGenLogger
 from src.utils.json_loader import load_json_folder
 from src.utils.config_loader import load_config
 import json
+import os
 
 logger = DocGenLogger(__name__)
 
@@ -88,10 +89,16 @@ class WeaviateCodeWriter:
         raw_deps = item.get('dependencies', [])
         dependencies_val = [json.dumps(d) if isinstance(d, dict) else str(d) for d in raw_deps]
         
+        file_name = os.path.basename(item.get('file_path', default_file_path))
+        origin_str = item.get('class_name', item.get('type', ''))
+        name_str = item.get('name', '')
+        node_id = f"{file_name}:{origin_str}:{name_str}"
+
         meta = {
             'type': item.get('type', ''),
             'name': item.get('name', ''),
             'file_path': item.get('file_path', default_file_path),
+            'node_id': node_id,
             'is_api_method': is_api_method_bool
         }
         
@@ -132,8 +139,6 @@ class WeaviateCodeWriter:
         
         if not files:
             logger.warning("No files provided to write")
-
-            files = load_json_folder(analyzer_output)
             
         # Process to documents
         documents = self.analyzed_files_to_documents(files)

@@ -24,6 +24,7 @@ import json
 from src.components.SourceHandler import SourceHandler
 from src.components.FrameworkValidator import FrameworkValidator
 from src.components.WeaviateCodeWriter import WeaviateCodeWriter
+from src.components.FileHasher import FileHasher
 from src.components.DocumentationCreator import DocumentationCreator
 from src.components.DocumentationMerger import DocumentationMerger
 from src.utils.config_loader import load_config
@@ -76,27 +77,38 @@ class DocumentationPipeline:
         # framework_validator = FrameworkValidator(self.config_path)
 
         weaviate_writer = WeaviateCodeWriter(weaviate_url=self.weaviate_url)
-        # doc_creator = DocumentationCreator(
-        #     weaviate_url=self.weaviate_url,
-        #     config_path=self.config_path
-        # )
-        # doc_merger = DocumentationMerger(self.config_path)
+        doc_creator = DocumentationCreator(
+            weaviate_url=self.weaviate_url,
+            config_path=self.config_path
+        )
+        doc_merger = DocumentationMerger(self.config_path)
+        file_hasher = FileHasher()
         files_analyzer = FilesAnalyzer()
         graph_manager = EndpointGraphManager()
         
         # Add components
         self.pipeline.add_component("source_handler", source_handler)
+        self.pipeline.add_component("file_hasher", file_hasher)
         self.pipeline.add_component("files_analyzer", files_analyzer)
         self.pipeline.add_component("weaviate_writer", weaviate_writer)
         self.pipeline.add_component("graph_manager", graph_manager)
+        self.pipeline.add_component("doc_creator", doc_creator)
+        self.pipeline.add_component("doc_merger", doc_merger)
 
         # Connect components
-        # 1. Source -> Analyzer
-        self.pipeline.connect("source_handler.files", "files_analyzer.input_files")
-        # 2a. Analyzer -> GraphManager
+        # 1. Source -> Hasher
+        self.pipeline.connect("source_handler.files", "file_hasher.files")
+        self.pipeline.connect("source_handler.working_dir", "file_hasher.working_dir")
+        # 2. Hasher -> Analyzer
+        self.pipeline.connect("file_hasher.files", "files_analyzer.input_files")
+        # 3a. Analyzer -> GraphManager
         self.pipeline.connect("files_analyzer.files", "graph_manager.analyzed_files")
-        # 2b. Analyzer -> Weaviate
+        # 3b. Analyzer -> Weaviate
         self.pipeline.connect("files_analyzer.files", "weaviate_writer.files")
+        # 4. GraphManager -> DocMaker
+        self.pipeline.connect("graph_manager.endpoint_graphs", "doc_creator.endpoint_graphs")
+        # 5. DocMaker -> DocMerger
+        self.pipeline.connect("doc_creator.output_dir", "doc_merger.output_dir")
     
     def run(
         self,
@@ -126,7 +138,7 @@ class DocumentationPipeline:
                         "credentials": credentials
                     }
                 },
-                include_outputs_from={"files_analyzer", "weaviate_writer", "graph_manager"}
+                include_outputs_from={"files_analyzer", "weaviate_writer", "graph_manager", "doc_creator", "doc_merger"}
             )
             
             # Extract results for report
@@ -135,17 +147,18 @@ class DocumentationPipeline:
             
             writer_result = result.get("weaviate_writer", {})
             graph_result = result.get("graph_manager", {})
-            # merger_result = result.get("doc_merger", {})
-            # doc_creator_result = result.get("doc_creator", {})
+            merger_result = result.get("doc_merger", {})
+            doc_creator_result = result.get("doc_creator", {})
             
             return {
                 "status": "completed",
                 "files": len(files),
                 "documents_stored": writer_result.get("documents_written", 0),
                 "endpoint_graphs": len(graph_result.get("endpoint_graphs", {})),
-                # "methods_documented": doc_creator_result.get("methods_processed", 0),
-                # "endpoints_merged": merger_result.get("endpoints_merged", 0),
-                # "swagger_path": merger_result.get("swagger_path", ""),
+                "methods_documented": doc_creator_result.get("methods_processed", 0),
+                "methods_failed": doc_creator_result.get("methods_failed", 0),
+                "endpoints_merged": merger_result.get("endpoints_merged", 0),
+                "swagger_path": merger_result.get("swagger_path", ""),
             }
             
         except Exception as e:

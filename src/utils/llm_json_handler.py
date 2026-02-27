@@ -5,12 +5,12 @@ Provides robust JSON extraction, repair, and parsing from LLM responses
 with retry logic and fallback handling.
 """
 
-import json
 import re
-import logging
+import json
+from src.utils.logger import DocGenLogger
 from typing import Optional, Any, Callable
 
-logger = logging.getLogger(__name__)
+logger = DocGenLogger(__name__)
 
 
 class LLMJsonHandler:
@@ -103,7 +103,8 @@ class LLMJsonHandler:
     @classmethod
     def parse_with_retry(
         cls,
-        response: str,
+        response: Optional[str] = None,
+        *,
         generator: Any,
         prompt: str,
         max_retries: int = 2
@@ -123,6 +124,8 @@ class LLMJsonHandler:
         Raises:
             json.JSONDecodeError: If all attempts fail
         """
+        if not response:
+            response = generator.run(prompt)['replies'][0]
         for attempt in range(max_retries + 1):
             try:
                 return cls.parse(response)

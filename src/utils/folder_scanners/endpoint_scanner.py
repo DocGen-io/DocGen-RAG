@@ -42,8 +42,23 @@ class EndpointFolderScanner(FolderScanner):
     
     def _extract_http_method(self, swagger_data: Dict) -> str:
         """Extract HTTP method from endpoint data. Returns None if not found."""
+        # 1. Check top-level keys first (injected by DocCreator)
         for field in ["method", "httpMethod", "http_method"]:
             if swagger_data.get(field):
                 return swagger_data[field]
+                
+        # 2. Check within 'paths' if the LLM outputted a full paths object
+        if "paths" in swagger_data:
+            for path, path_obj in swagger_data["paths"].items():
+                if isinstance(path_obj, dict):
+                    for method in ["get", "post", "put", "patch", "delete", "options", "head"]:
+                        if method in path_obj:
+                            return method
+                            
+        # 3. Check if the root level IS the path object itself
+        for method in ["get", "post", "put", "patch", "delete", "options", "head"]:
+            if method in swagger_data:
+                return method
+                
         return None
 
