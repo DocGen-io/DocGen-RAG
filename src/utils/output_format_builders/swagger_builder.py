@@ -41,11 +41,27 @@ class SwaggerBuilder(OutputFormatBuilder):
         }
         if self.base_url:
             spec["servers"] = [{"url": self.base_url}]
+            
+        valid_methods = {"get", "put", "post", "delete", "options", "head", "patch", "trace"}
         
         for ep in endpoints:
             http_method = ep.get("http_method", "GET").lower()
+            if http_method not in valid_methods:
+                logger.warning(f"Skipping endpoint {ep.get('method_name')} with invalid HTTP method: {http_method}")
+                continue
+                
             data = ep.get("data", {})
-            path = self._normalize_path(data.get("path") or f"/{ep.get('method_name', 'unknown')}")
+            original_path = data.get("path") or f"/{ep.get('method_name', 'unknown')}"
+            path = self._normalize_path(original_path)
+            
+            # Deduplicator: If this path+method combination already exists, we skip it
+            # instead of creating a fake/modified path, ensuring the true API path is strictly presented.
+            if path in spec["paths"] and http_method in spec["paths"][path]:
+                logger.warning(
+                    f"Duplicate API route detected: {http_method.upper()} {path} "
+                    f"(from {ep.get('method_name')}). Skipping to preserve the original, canonical path."
+                )
+                continue
             
             if path not in spec["paths"]:
                 spec["paths"][path] = {}
@@ -80,12 +96,20 @@ class SwaggerBuilder(OutputFormatBuilder):
         
         if "parameters" in data:
             op["parameters"] = self._normalize_parameters(data["parameters"], path_params)
+        elif path_params:
+            # If LLM completely forgot the parameters array but the path has {var}, we must inject them
+            op["parameters"] = self._normalize_parameters([], path_params)
         
         # Only add requestBody for POST/PUT/PATCH (not GET/HEAD/DELETE)
         if http_method not in self.NO_BODY_METHODS and "requestBody" in data:
             op["requestBody"] = self._normalize_request_body(data["requestBody"])
         
+        # OpenAPI 3.0 STRICT RULE: Every operation MUST have at least one response
         op["responses"] = self._normalize_responses(data.get("responses"))
+        if not op["responses"]:
+            logger.warning(f"Operation {http_method.upper()} {path} missing responses. Auto-injecting default 200.")
+            op["responses"] = {"200": {"description": "Successful operation"}}
+            
         return op
     
     def _normalize_parameters(self, params: List[Dict], path_params: set) -> List[Dict]:
@@ -94,35 +118,80 @@ class SwaggerBuilder(OutputFormatBuilder):
         
         - Converts Swagger 2.0 'type' to 'schema' object
         - Ensures 'required' field exists (path params are always required)
-        - Skips 'body' params (handled by requestBody in OpenAPI 3.0)
-        - Validates path params exist in URL template
+        - Skips 'body' and 'formData' params (handled by requestBody in OpenAPI 3.0)
+        - Strictly validates 'in' is one of: query, header, path, cookie
+        - Fixes LLM path location mismatches automatically.
         
         See: https://swagger.io/specification/#parameter-object
         """
         result = []
+        valid_locations = {"query", "header", "path", "cookie"}
+        seen_path_params = set()
+        
         for p in params:
-            # In OpenAPI 3.0, body params are handled via requestBody
-            if p.get("in") == "body":
+            loc = p.get("in", "query").lower()
+            name = p.get("name", "unnamed")
+            
+            # Auto-correction: If the parameter name is explicitly in the URL path template,
+            # it MUST be "in": "path" according to OpenAPI, regardless of what the LLM generated.
+            if name in path_params:
+                loc = "path"
+
+            # In OpenAPI 3.0, body and formData params are handled via requestBody,
+            # and any other random hallucinated location is strictly invalid.
+            if loc not in valid_locations:
+                if loc not in {"body", "formdata"}:
+                    logger.warning(f"Skipping parameter '{name}' with invalid OpenAPI 3.0 location: {loc}")
                 continue
             
-            name, loc = p.get("name", "unnamed"), p.get("in", "query")
-            
-            # Path params must exist in the URL template
-            if loc == "path" and name not in path_params:
-                logger.warning(f"Skipping path parameter '{name}' - not in path template")
-                continue
+            if loc == "path":
+                # Path params MUST exist in the URL template
+                if name not in path_params:
+                    logger.warning(f"Skipping path parameter '{name}' - not in path template")
+                    continue
+                seen_path_params.add(name)
             
             # Build schema object (OpenAPI 3.0 requires schema, not type at param level)
             schema = p.get("schema") or {"type": p.get("type", "string")}
+            schema = self._normalize_schema(schema)
+            
+            # OpenAPI 3.0 limits complex objects inside 'query' unless `style`/`explode` are configured.
+            # If the LLM generates a giant deep object schema for a query param, it usually meant to
+            # create a requestBody. We simplify it back to a string to prevent Swagger UI from crashing.
+            if loc == "query" and schema.get("type") == "object" and "properties" in schema:
+                logger.warning(f"Flattening complex object query parameter '{name}' to string. (Did LLM mean requestBody?)")
+                schema = {"type": "string", "description": "Serialized object data"}
+
             for prop in ["default", "minimum", "maximum", "enum", "format"]:
                 if prop in p and prop not in schema:
                     schema[prop] = p[prop]
             
-            # Path params must be required=true
-            norm = {"name": name, "in": loc, "required": True if loc == "path" else p.get("required", False), "schema": schema}
+            # Path params MUST be required=true
+            norm = {
+                "name": name, 
+                "in": loc, 
+                "required": True if loc == "path" else p.get("required", False), 
+                "schema": schema
+            }
             if "description" in p:
                 norm["description"] = p["description"]
+            if "x-suggested-name" in p:
+                norm["x-suggested-name"] = p["x-suggested-name"]
             result.append(norm)
+            
+        # MISSING PATH PARAM INJECTION
+        # If the endpoint path has /users/{id} but the LLM completely forgot to define 
+        # the parameters array, or missed 'id', we MUST inject it to make it valid OpenAPI 3.0.
+        for missing_path_param in path_params - seen_path_params:
+            logger.info(f"Auto-injecting missing path parameter: '{missing_path_param}'")
+            result.append({
+                "name": missing_path_param,
+                "in": "path",
+                "required": True,
+                "schema": {"type": "string"},
+                "description": f"Auto-generated path parameter for {missing_path_param}"
+            })
+            
         return result
     
     def _normalize_request_body(self, rb: Dict[str, Any]) -> Dict[str, Any]:
@@ -192,23 +261,31 @@ class SwaggerBuilder(OutputFormatBuilder):
         Handles:
         - Array format: [{"code": 200, "description": "OK"}] -> {"200": {"description": "OK"}}
         - Dict format: {200: {...}} -> {"200": {...}}
+        - Strips out any irregular keys that aren't 'default' or a valid 3-digit status code.
         
         See: https://swagger.io/specification/#responses-object
         """
         if not responses:
             return {"200": {"description": "Success"}}
         
-        if isinstance(responses, dict):
-            return {str(k): self._normalize_response(v) if isinstance(v, dict) else {"description": "Response"} for k, v in responses.items()}
+        result = {}
         
-        if isinstance(responses, list):
-            result = {}
+        if isinstance(responses, dict):
+            for k, v in responses.items():
+                k_str = str(k)
+                if k_str == 'default' or (k_str.isdigit() and 100 <= int(k_str) <= 599):
+                    result[k_str] = self._normalize_response(v) if isinstance(v, dict) else {"description": "Response"}
+                else:
+                    logger.warning(f"Stripping invalid status code from responses: {k_str}")
+        
+        elif isinstance(responses, list):
             for r in responses:
                 if isinstance(r, dict):
-                    result[str(r.get("code", r.get("status", 200)))] = self._normalize_response(r)
-            return result or {"200": {"description": "Success"}}
+                    k_str = str(r.get("code", r.get("status", 200)))
+                    if k_str == 'default' or (k_str.isdigit() and 100 <= int(k_str) <= 599):
+                        result[k_str] = self._normalize_response(r)
         
-        return {"200": {"description": "Success"}}
+        return result or {"200": {"description": "Success"}}
     
     def _normalize_response(self, r: Dict[str, Any]) -> Dict[str, Any]:
         """Normalize a single Response Object. See: https://swagger.io/specification/#response-object"""
