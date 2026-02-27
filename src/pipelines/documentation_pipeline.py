@@ -81,7 +81,7 @@ class DocumentationPipeline:
             weaviate_url=self.weaviate_url,
             config_path=self.config_path
         )
-        # doc_merger = DocumentationMerger(self.config_path)
+        doc_merger = DocumentationMerger(self.config_path)
         file_hasher = FileHasher()
         files_analyzer = FilesAnalyzer()
         graph_manager = EndpointGraphManager()
@@ -93,6 +93,7 @@ class DocumentationPipeline:
         self.pipeline.add_component("weaviate_writer", weaviate_writer)
         self.pipeline.add_component("graph_manager", graph_manager)
         self.pipeline.add_component("doc_creator", doc_creator)
+        self.pipeline.add_component("doc_merger", doc_merger)
 
         # Connect components
         # 1. Source -> Hasher
@@ -106,6 +107,8 @@ class DocumentationPipeline:
         self.pipeline.connect("files_analyzer.files", "weaviate_writer.files")
         # 4. GraphManager -> DocMaker
         self.pipeline.connect("graph_manager.endpoint_graphs", "doc_creator.endpoint_graphs")
+        # 5. DocMaker -> DocMerger
+        self.pipeline.connect("doc_creator.output_dir", "doc_merger.output_dir")
     
     def run(
         self,
@@ -135,7 +138,7 @@ class DocumentationPipeline:
                         "credentials": credentials
                     }
                 },
-                include_outputs_from={"files_analyzer", "weaviate_writer", "graph_manager", "doc_creator"}
+                include_outputs_from={"files_analyzer", "weaviate_writer", "graph_manager", "doc_creator", "doc_merger"}
             )
             
             # Extract results for report
@@ -144,7 +147,7 @@ class DocumentationPipeline:
             
             writer_result = result.get("weaviate_writer", {})
             graph_result = result.get("graph_manager", {})
-            # merger_result = result.get("doc_merger", {})
+            merger_result = result.get("doc_merger", {})
             doc_creator_result = result.get("doc_creator", {})
             
             return {
@@ -154,8 +157,8 @@ class DocumentationPipeline:
                 "endpoint_graphs": len(graph_result.get("endpoint_graphs", {})),
                 "methods_documented": doc_creator_result.get("methods_processed", 0),
                 "methods_failed": doc_creator_result.get("methods_failed", 0),
-                # "endpoints_merged": merger_result.get("endpoints_merged", 0),
-                # "swagger_path": merger_result.get("swagger_path", ""),
+                "endpoints_merged": merger_result.get("endpoints_merged", 0),
+                "swagger_path": merger_result.get("swagger_path", ""),
             }
             
         except Exception as e:

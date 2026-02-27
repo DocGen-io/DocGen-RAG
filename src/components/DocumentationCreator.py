@@ -81,6 +81,8 @@ class DocumentationCreator:
         full_path = f"{base_path.rstrip('/')}/{path.lstrip('/')}" if path else base_path
         
         return {
+            "method": http_method.lower(),
+            "path": full_path,
             "swagger": {
                 "summary": method_name,
                 "description": f"Endpoint: {method_name}. Documentation could not be fully generated.",
@@ -120,8 +122,7 @@ class DocumentationCreator:
         logger.warning(f"Using fallback documentation for {method.get('method_name')}")
         return self._create_fallback_documentation(method)
 
-    
-    def _save_outputs(self, method_name: str, documentation: Dict) -> Dict[str, str]:
+    def _save_outputs(self, method_name: str, documentation: Dict, method_info: Dict) -> Dict[str, str]:
         """Save Swagger JSON files to output directory."""
         # Create method-specific output directory
         method_dir = os.path.join(self.output_dir, method_name)
@@ -131,6 +132,11 @@ class DocumentationCreator:
         
         # Save Swagger JSON
         swagger_data = documentation.get("swagger", {})
+        
+        # Inject method and path at the root level of swagger.json so Merger doesn't drop them
+        swagger_data["method"] = documentation.get("method", method_info.get("method_type", "get")).lower()
+        swagger_data["path"] = documentation.get("path", method_info.get("method_path", f"/{method_name}"))
+        
         swagger_path = os.path.join(method_dir, "swagger.json")
         with open(swagger_path, "w", encoding="utf-8") as f:
             json.dump(swagger_data, f, indent=2)
@@ -221,7 +227,7 @@ class DocumentationCreator:
                 if documentation:
                     method_name = method_info.get("method_name", "unknown")
                     # Save output files
-                    saved = self._save_outputs(method_name, documentation)
+                    saved = self._save_outputs(method_name, documentation, method_info)
                     output_files[method_name] = saved
                     methods_processed += 1
                 else:
