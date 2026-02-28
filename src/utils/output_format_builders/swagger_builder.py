@@ -7,8 +7,10 @@ OpenAPI 3.0.3 Schema: https://spec.openapis.org/oas/v3.0.3
 from typing import Dict, Any, List, Optional
 import re, logging
 from src.utils.output_format_builders.base import OutputFormatBuilder
+from src.utils.definitions import API_METHODS
+from src.utils.logger import DocGenLogger
 
-logger = logging.getLogger(__name__)
+logger = DocGenLogger(__name__)
 
 
 class SwaggerBuilder(OutputFormatBuilder):
@@ -237,11 +239,19 @@ class SwaggerBuilder(OutputFormatBuilder):
             key = next(iter(schema))
             if key not in ["type", "$ref", "properties", "items", "allOf", "oneOf", "anyOf"]:
                 return self._normalize_schema(schema[key])
-        
+                
+        # Handle invalid OpenAPI 3.0 type: "binary" 
+        if schema.get("type") == "binary":
+            schema["type"] = "string"
+            schema["format"] = "binary"
+            
         # Inline $ref since we don't have components defined
         if "$ref" in schema:
-            type_name = schema["$ref"].split("/")[-1].replace("[]", "")
-            if "[]" in schema["$ref"]:
+            ref_val = schema["$ref"]
+            if not isinstance(ref_val, str):
+                return {"type": "object"}
+            type_name = ref_val.split("/")[-1].replace("[]", "")
+            if "[]" in ref_val:
                 return {"type": "array", "items": {"type": "object", "description": f"Item of {type_name}"}}
             return {"type": "object", "description": f"Object of type {type_name}"}
         

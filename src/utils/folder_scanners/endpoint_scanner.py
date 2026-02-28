@@ -4,6 +4,7 @@ import os
 import logging
 from src.utils.folder_scanners.base import FolderScanner
 from src.utils.json_loader import load_json_file
+from src.utils.definitions import API_METHODS
 
 logger = logging.getLogger(__name__)
 
@@ -51,12 +52,12 @@ class EndpointFolderScanner(FolderScanner):
         if "paths" in swagger_data:
             for path, path_obj in swagger_data["paths"].items():
                 if isinstance(path_obj, dict):
-                    for method in ["get", "post", "put", "patch", "delete", "options", "head"]:
+                    for method in API_METHODS:
                         if method in path_obj:
                             return method
                             
         # 3. Check if the root level IS the path object itself
-        for method in ["get", "post", "put", "patch", "delete", "options", "head"]:
+        for method in API_METHODS:
             if method in swagger_data:
                 return method
                 
