@@ -100,9 +100,9 @@ class DocumentationPipeline:
         self.pipeline.connect("source_handler.files", "file_hasher.files")
         self.pipeline.connect("source_handler.working_dir", "file_hasher.working_dir")
         # 2. Hasher -> Analyzer
-        self.pipeline.connect("file_hasher.files", "files_analyzer.input_files")
+        self.pipeline.connect("file_hasher.files", "files_analyzer.files")
         # 3a. Analyzer -> GraphManager
-        self.pipeline.connect("files_analyzer.files", "graph_manager.analyzed_files")
+        self.pipeline.connect("files_analyzer.files", "graph_manager.files")
         # 3b. Analyzer -> Weaviate
         self.pipeline.connect("files_analyzer.files", "weaviate_writer.files")
         # 4. GraphManager -> DocMaker
@@ -130,12 +130,35 @@ class DocumentationPipeline:
         try:
             logger.info(f"Starting unified pipeline run for {path} ({source_type})", location="run")
             
+            # Extract project name from path
+            # E.g., from 'apis-test/nestjs' -> 'nestjs'
+            # E.g., from 'https://github.com/user/repo.git' -> 'repo'
+            project_name = os.path.basename(os.path.normpath(path))
+            project_name = project_name.split("/")[-1]
+            print(project_name)
+            if project_name.endswith('.git'):
+                project_name = project_name[:-4]
+            if not project_name:
+                project_name = "default_project"
+            
             result = self.pipeline.run(
                 {
                     "source_handler": {
                         "source_type": source_type,
                         "path": path,
                         "credentials": credentials
+                    },
+                    "file_hasher": {
+                        "project_name": project_name
+                    },
+                    "graph_manager": {
+                        "project_name": project_name
+                    },
+                    "doc_creator": {
+                        "project_name": project_name
+                    },
+                    "doc_merger": {
+                        "project_name": project_name
                     }
                 },
                 include_outputs_from={"files_analyzer", "weaviate_writer", "graph_manager", "doc_creator", "doc_merger"}
@@ -176,10 +199,17 @@ def main():
     """Run pipeline on apis-test directory for testing."""
     import sys
     
-    path = sys.argv[1] if len(sys.argv) > 1 else "apis-test/nestjs"
+    source_type = "local"
+    path = "apis-test/nestjs"
     
+    if len(sys.argv) == 3:
+        source_type = sys.argv[1]
+        path = sys.argv[2]
+    elif len(sys.argv) == 2:
+        path = sys.argv[1]
+        
     pipeline = DocumentationPipeline()
-    result = pipeline.run(source_type="git" if len(sys.argv) > 1 else "local", path=path)
+    result = pipeline.run(source_type=source_type, path=path)
     
     print("\n=== Pipeline Result ===")
     for key, value in result.items():

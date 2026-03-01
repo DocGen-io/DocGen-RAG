@@ -16,11 +16,11 @@ logger = DocGenLogger(__name__)
 class EndpointGraphManager:
     """Manages independent graphs for each API endpoint found by filesAnalyzer."""
     
-    def __init__(self, db_path: str = "dependencies.db"):
+    def __init__(self, default_db_name: str = "dependencies.db"):
         # Maps endpoint method ID to its complete DependencyGraph
         self.endpoint_graphs: Dict[str, DependencyGraph] = {}
-        self.db_path = db_path
-        self._init_db()
+        self.default_db_name = default_db_name
+        self.db_path = None
         
     def _init_db(self):
         """Initialize SQLite database for dependency tracking."""
@@ -169,15 +169,21 @@ class EndpointGraphManager:
         return str(dep)
         
     @component.output_types(endpoint_graphs=Dict[str, Any])
-    def run(self, analyzed_files: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    def run(self, files: List[Dict[str, Any]], project_name: str) -> Dict[str, Dict[str, Any]]:
         """
         Instantiates one graph per endpoint method and traverses dependencies.
         """
+        # Set up project-specific DB path
+        output_dir = os.path.join("output", project_name)
+        os.makedirs(output_dir, exist_ok=True)
+        self.db_path = os.path.join(output_dir, self.default_db_name)
+        self._init_db()
+        
         all_components = {}
         endpoints = []
         
         # 1. First sweep to locate endpoints and index all components for fast lookup
-        for file_info in analyzed_files:
+        for file_info in files:
             file_path = file_info.get("file_path", "")
             content = file_info.get("content", [])
             
@@ -194,7 +200,7 @@ class EndpointGraphManager:
                 item_with_context["_source_file_path"] = file_path
                 all_components[component_id] = item_with_context
                 
-                if item.get("is_api_method"):
+                if item.get("is_api_method") and str(item.get("type", "")).lower() == "function":
                     endpoints.append(component_id)
                     
         # 2. Build independent graphs for each endpoint method
