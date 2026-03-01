@@ -168,11 +168,11 @@ class FilesAnalyzer:
     @component.output_types(
        files=List[Dict[str, Any]],
     )
-    def run(self, input_files: List[Dict[str, str]]):
+    def run(self, files: List[Dict[str, str]]):
         
 
         # first number lines of file
-        results =  self.parallel_numbering(input_files)
+        results =  self.parallel_numbering(files)
 
         # then analyze the files
         results = self.analyze_files(results)

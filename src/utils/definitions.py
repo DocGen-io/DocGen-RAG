@@ -1,0 +1,1 @@
+API_METHODS =  {"get", "post", "put", "patch", "delete", "options", "head"}

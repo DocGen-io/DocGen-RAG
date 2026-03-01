@@ -58,11 +58,12 @@ class DocumentationMerger:
         swagger_path=str,
         endpoints_merged=int
     )
-    def run(self, output_dir: Optional[str] = None) -> Dict[str, Any]:
+    def run(self, project_name: str, output_dir: Optional[str] = None) -> Dict[str, Any]:
         """
         Merge all endpoint documentation files into complete output files.
         
         Args:
+            project_name: Name of the project to merge docs for
             output_dir: Path to directory containing endpoint folders.
                        Defaults to config value if not provided.
                        
@@ -71,10 +72,8 @@ class DocumentationMerger:
                 - swagger_path: Path to generated swagger.json
                 - endpoints_merged: Number of endpoints merged
         """
-        # Use provided output_dir or default from config
-        output_dir = output_dir or self.default_output_dir
-        
-        output_dir = output_dir or self.default_output_dir
+        # Use provided output_dir or default from config combined with project_name
+        output_dir = output_dir or os.path.join(self.default_output_dir, project_name)
         
         logger.info(f"Starting DocumentationMerger on {output_dir}", location="run")
         

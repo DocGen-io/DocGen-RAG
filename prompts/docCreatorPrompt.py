@@ -35,6 +35,7 @@ Return a JSON object with exactly three keys:
 2. "path": The complete normalized endpoint path (e.g., "/users/{id}").
 3. "swagger": A valid OpenAPI 3.0 path operation object containing: summary, description, parameters, requestBody (if applicable), responses, security.
 
+### IMPORTANT (DO NOT SKIP)
 RETURN ONLY VALID JSON. NO MARKDOWN CODE BLOCKS. NO EXPLANATIONS.
 
 ### RESPONSE""")

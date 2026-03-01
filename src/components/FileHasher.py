@@ -15,9 +15,9 @@ class FileHasher:
     that have changed since the last run.
     """
     
-    def __init__(self, db_path: str = "dependencies.db"):
-        self.db_path = db_path
-        self._init_db()
+    def __init__(self, default_db_name: str = "dependencies.db"):
+        self.default_db_name = default_db_name
+        self.db_path = None
         
     def _init_db(self):
         """Initialize SQLite table for file hashes."""
@@ -56,11 +56,17 @@ class FileHasher:
         files=List[Dict[str, str]],
         working_dir=str
     )
-    def run(self, files: List[Dict[str, str]], working_dir: str) -> Dict[str, Any]:
+    def run(self, files: List[Dict[str, str]], working_dir: str, project_name: str) -> Dict[str, Any]:
         """
         Process the incoming list of files, hash them using Git, and return only the ones
         that have changed (or are new) since the last execution.
         """
+        # Set up project-specific DB path
+        output_dir = os.path.join("output", project_name)
+        os.makedirs(output_dir, exist_ok=True)
+        self.db_path = os.path.join(output_dir, self.default_db_name)
+        self._init_db()
+        
         changed_files = []
         
         try:
