@@ -15,7 +15,7 @@ import os
 import logging
 from typing import Dict, Any, Optional, List
 
-from haystack import Pipeline
+from haystack.core.pipeline import AsyncPipeline
 import phoenix as px
 from openinference.instrumentation.haystack import HaystackInstrumentor
 from phoenix.otel import register
@@ -27,6 +27,7 @@ from src.components.WeaviateCodeWriter import WeaviateCodeWriter
 from src.components.FileHasher import FileHasher
 from src.components.DocumentationCreator import DocumentationCreator
 from src.components.DocumentationMerger import DocumentationMerger
+from src.components.WeaviateDocWriter import WeaviateDocWriter
 from src.utils.config_loader import load_config
 from src.utils.logger import DocGenLogger
 import traceback
@@ -54,7 +55,7 @@ class DocumentationPipeline:
         self._setup_tracing()
         self.weaviate_url = self.config['WEAVIATE_URL'] or "http://127.0.0.1:8080"
         
-        self.pipeline = Pipeline()
+        self.pipeline = AsyncPipeline()
         self._build_pipeline()
     
     def _setup_tracing(self):
@@ -85,6 +86,10 @@ class DocumentationPipeline:
         file_hasher = FileHasher()
         files_analyzer = FilesAnalyzer()
         graph_manager = EndpointGraphManager()
+        weaviate_doc_writer = WeaviateDocWriter(
+            weaviate_url=self.weaviate_url,
+            config_path=self.config_path
+        )
         
         # Add components
         self.pipeline.add_component("source_handler", source_handler)
@@ -93,6 +98,7 @@ class DocumentationPipeline:
         self.pipeline.add_component("weaviate_writer", weaviate_writer)
         self.pipeline.add_component("graph_manager", graph_manager)
         self.pipeline.add_component("doc_creator", doc_creator)
+        self.pipeline.add_component("weaviate_doc_writer", weaviate_doc_writer)
         self.pipeline.add_component("doc_merger", doc_merger)
 
         # Connect components
@@ -109,6 +115,9 @@ class DocumentationPipeline:
         self.pipeline.connect("graph_manager.endpoint_graphs", "doc_creator.endpoint_graphs")
         # 5. DocMaker -> DocMerger
         self.pipeline.connect("doc_creator.output_dir", "doc_merger.output_dir")
+        # 6. DocMaker -> WeaviateDocWriter (vectorize endpoint docs)
+        self.pipeline.connect("doc_creator.output_files", "weaviate_doc_writer.output_files")
+        self.pipeline.connect("doc_creator.output_dir", "weaviate_doc_writer.output_dir")
     
     def run(
         self,
