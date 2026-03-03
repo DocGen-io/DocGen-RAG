@@ -15,6 +15,12 @@ Generate documentation (strictly in OpenAPI 3.0 format) for the following API en
 6. **DEEP DESCRIPTIONS**: Your descriptions must be exhaustive: explain what the endpoint does, side effects, authentication/authorization requirements, and edge cases (e.g., when a 404 is returned).
 7. **REQUEST BODY STRUCTURE**: `requestBody` must be properly formatted: `"requestBody": {"content": {"application/json": {"schema": {"type": "object", "properties": {...}}}}}`. Do NOT use `"in": "body"`.
 
+### SECURITY ANALYSIS
+Append security concerns at the end of the `description` field. Check for: HTTP usage, exposed token/credential, injection risks, missing auth, hardcoded secrets. Use format:
+` **Security Concerns:**  HIGH — ... / MEDIUM — ... / LOW — ...`
+If none found: `✅ **Security:** No concerns identified.`
+Do NOT add non-standard keys — security info goes ONLY in `description`.
+
 ### API METHOD CONTEXT
 Controller: $controller_name
 Method: $method_name
@@ -33,7 +39,7 @@ $dependencies_context
 Return a JSON object with exactly three keys:
 1. "method": The HTTP method of this endpoint (e.g., "get", "post") in lowercase.
 2. "path": The complete normalized endpoint path (e.g., "/users/{id}").
-3. "swagger": A valid OpenAPI 3.0 path operation object containing: summary, description, parameters, requestBody (if applicable), responses, security.
+3. "swagger": A valid OpenAPI 3.0 path operation object containing: summary, description (with security analysis appended), parameters, requestBody (if applicable), responses, security.
 
 ### IMPORTANT (DO NOT SKIP)
 RETURN ONLY VALID JSON. NO MARKDOWN CODE BLOCKS. NO EXPLANATIONS.
