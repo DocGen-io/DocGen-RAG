@@ -16,9 +16,10 @@ Generate documentation (strictly in OpenAPI 3.0 format) for the following API en
 7. **REQUEST BODY STRUCTURE**: `requestBody` must be properly formatted: `"requestBody": {"content": {"application/json": {"schema": {"type": "object", "properties": {...}}}}}`. Do NOT use `"in": "body"`.
 
 ### SECURITY ANALYSIS
-Append security concerns at the end of the `description` field. Check for: HTTP usage, exposed token/credential, injection risks, missing auth, hardcoded secrets. Use format:
-` **Security Concerns:**  HIGH — ... / MEDIUM — ... / LOW — ...`
-If none found: `✅ **Security:** No concerns identified.`
+Append security concerns at the end of the `description` field ONLY IF there are actual vulnerabilities (e.g., exposed tokens, injection risks, hardcoded secrets). 
+If an endpoint lacks authentication (like a public GET request) and it appears to be by design, DO NOT flag it as a security concern.
+If there are concerns, use the format: ` **Security Concerns:**  HIGH — ... / MEDIUM — ... / LOW — ...`
+If there are NO valid security concerns, DO NOT mention security at all. Omit the security section entirely from the description.
 Do NOT add non-standard keys — security info goes ONLY in `description`.
 
 ### API METHOD CONTEXT
