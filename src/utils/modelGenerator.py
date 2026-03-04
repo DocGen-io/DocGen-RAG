@@ -34,10 +34,12 @@ class ModelGenerator:
         config_path: str = "config.yaml",
         format_schema: Optional[dict] = None,
         temperature: Optional[float] = None,
+        seed: Optional[int] = None,
     ):
         self.llm_type = llm_type
         self.format_schema = format_schema
         self.temperature = temperature
+        self.seed = seed
         self.config = load_config(config_path)
         if not self.config:
             raise FileNotFoundError(f"Config file not found or empty: {config_path}")
@@ -85,6 +87,9 @@ class ModelGenerator:
 
         if self.temperature is not None:
             gen_kwargs["temperature"] = self.temperature
+            
+        if self.seed is not None:
+            gen_kwargs["seed"] = self.seed
 
         return OllamaChatGenerator(
             model=model,
