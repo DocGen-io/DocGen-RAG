@@ -25,6 +25,7 @@ from src.components.SourceHandler import SourceHandler
 from src.components.FrameworkValidator import FrameworkValidator
 from src.components.WeaviateCodeWriter import WeaviateCodeWriter
 from src.components.FileHasher import FileHasher
+from src.components.FileHashSaver import FileHashSaver
 from src.components.DocumentationCreator import DocumentationCreator
 from src.components.DocumentationMerger import DocumentationMerger
 from src.components.WeaviateDocWriter import WeaviateDocWriter
@@ -84,6 +85,7 @@ class DocumentationPipeline:
         )
         doc_merger = DocumentationMerger(self.config_path)
         file_hasher = FileHasher()
+        file_hash_saver = FileHashSaver()
         files_analyzer = FilesAnalyzer()
         graph_manager = EndpointGraphManager()
         weaviate_doc_writer = WeaviateDocWriter(
@@ -94,6 +96,7 @@ class DocumentationPipeline:
         # Add components
         self.pipeline.add_component("source_handler", source_handler)
         self.pipeline.add_component("file_hasher", file_hasher)
+        self.pipeline.add_component("file_hash_saver", file_hash_saver)
         self.pipeline.add_component("files_analyzer", files_analyzer)
         self.pipeline.add_component("weaviate_writer", weaviate_writer)
         self.pipeline.add_component("graph_manager", graph_manager)
@@ -118,6 +121,9 @@ class DocumentationPipeline:
         # 6. DocMaker -> WeaviateDocWriter (vectorize endpoint docs)
         self.pipeline.connect("doc_creator.output_files", "weaviate_doc_writer.output_files")
         self.pipeline.connect("doc_creator.output_dir", "weaviate_doc_writer.output_dir")
+        # 7. FileHasher & DocMerger -> FileHashSaver
+        self.pipeline.connect("file_hasher.pending_hashes", "file_hash_saver.pending_hashes")
+        self.pipeline.connect("doc_merger.endpoints_merged", "file_hash_saver.merge_status")
     
     def run(
         self,
@@ -160,6 +166,9 @@ class DocumentationPipeline:
                     "file_hasher": {
                         "project_name": project_name
                     },
+                    "file_hash_saver": {
+                        "project_name": project_name
+                    },
                     "graph_manager": {
                         "project_name": project_name
                     },
@@ -170,7 +179,7 @@ class DocumentationPipeline:
                         "project_name": project_name
                     }
                 },
-                include_outputs_from={"files_analyzer", "weaviate_writer", "graph_manager", "doc_creator", "doc_merger"}
+                include_outputs_from={"files_analyzer", "weaviate_writer", "graph_manager", "doc_creator", "doc_merger", "file_hash_saver"}
             )
             
             # Extract results for report
@@ -181,6 +190,7 @@ class DocumentationPipeline:
             graph_result = result.get("graph_manager", {})
             merger_result = result.get("doc_merger", {})
             doc_creator_result = result.get("doc_creator", {})
+            saver_result = result.get("file_hash_saver", {})
             
             return {
                 "status": "completed",
@@ -191,6 +201,7 @@ class DocumentationPipeline:
                 "methods_failed": doc_creator_result.get("methods_failed", 0),
                 "endpoints_merged": merger_result.get("endpoints_merged", 0),
                 "swagger_path": merger_result.get("swagger_path", ""),
+                "hashes_saved": saver_result.get("hashes_saved", 0)
             }
             
         except Exception as e:

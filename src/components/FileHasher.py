@@ -54,7 +54,8 @@ class FileHasher:
             
     @component.output_types(
         files=List[Dict[str, str]],
-        working_dir=str
+        working_dir=str,
+        pending_hashes=Dict[str, str]
     )
     def run(self, files: List[Dict[str, str]], working_dir: str, project_name: str) -> Dict[str, Any]:
         """
@@ -68,6 +69,7 @@ class FileHasher:
         self._init_db()
         
         changed_files = []
+        pending_hashes = {}
         
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -98,22 +100,19 @@ class FileHasher:
                     if row is None or row[0] != current_hash:
                         # It's new or modified
                         changed_files.append(file_entry)
-                        # Upsert hash
-                        cursor.execute('''
-                            INSERT OR REPLACE INTO file_hashes (file_path, git_hash)
-                            VALUES (?, ?)
-                        ''', (db_key, current_hash))
+                        pending_hashes[db_key] = current_hash
                         
-                conn.commit()
+                # No longer committing hashes here.
                 
         except Exception as e:
             logger.error(f"Database error during file hashing: {e}")
             # Failsafe: return all files if DB is down
-            return {"files": files, "working_dir": working_dir}
+            return {"files": files, "working_dir": working_dir, "pending_hashes": {}}
             
         logger.info(f"FileHasher filtered {len(files)} files down to {len(changed_files)} changed files.")
         
         return {
             "files": changed_files,
-            "working_dir": working_dir
+            "working_dir": working_dir,
+            "pending_hashes": pending_hashes
         }

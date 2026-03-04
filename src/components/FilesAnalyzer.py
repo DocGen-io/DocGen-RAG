@@ -17,9 +17,8 @@ logger = DocGenLogger()
 @component
 class FilesAnalyzer:
     def __init__(self, max_workers: int = 5):
-        # Allow the user to define thread count during initialization
         self.max_workers = max_workers
-        self.model_generator = ModelGenerator("code_analyzer").get_generator()  
+        self.model_generator = ModelGenerator("code_analyzer", temperature=0.0, seed=42).get_generator()  
         self.config = load_config("config.yaml")
         self.llm_json_handler = LLMJsonHandler()
 
