@@ -83,12 +83,12 @@ class LLMJsonHandler:
         return json_string
     
     @classmethod
-    def parse(cls, response: str) -> dict:
+    def parse(cls, response: Any) -> dict:
         """
         Parse JSON from LLM response with extraction and repair.
         
         Args:
-            response: Raw LLM response
+            response: Raw LLM response (string or ChatMessage)
             
         Returns:
             Parsed JSON as dictionary
@@ -96,17 +96,27 @@ class LLMJsonHandler:
         Raises:
             json.JSONDecodeError: If parsing fails after repair
         """
-        extracted = cls.extract_json(response)
+        # Extract text content if response is a ChatMessage
+        if hasattr(response, 'text') and response.text is not None:
+            response_str = response.text
+        elif hasattr(response, 'content') and response.content is not None:
+            response_str = response.content
+        elif isinstance(response, str):
+            response_str = response
+        else:
+            response_str = str(response)
+            
+        extracted = cls.extract_json(response_str)
         repaired = cls.repair_json(extracted)
         return json.loads(repaired)
     
     @classmethod
     def parse_with_retry(
         cls,
-        response: Optional[str] = None,
+        response: Optional[Any] = None,
         *,
         generator: Any,
-        prompt: str,
+        prompt: Any,
         max_retries: int = 2
     ) -> dict:
         """
@@ -124,23 +134,35 @@ class LLMJsonHandler:
         Raises:
             json.JSONDecodeError: If all attempts fail
         """
+        
+        def _run_generator():
+            try:
+                # Try as text generator (e.g., OllamaGenerator)
+                return generator.run(prompt)['replies'][0]
+            except TypeError:
+                # Fallback for chat generators
+                from haystack.dataclasses import ChatMessage
+                msg = prompt if isinstance(prompt, ChatMessage) else ChatMessage.from_user(prompt)
+                return generator.run(messages=[msg])['replies'][0]
+                
         if not response:
-            response = generator.run(prompt)['replies'][0]
+            response = _run_generator()
+            
         for attempt in range(max_retries + 1):
             try:
                 return cls.parse(response)
             except json.JSONDecodeError as e:
                 if attempt < max_retries:
                     logger.warning(f"Attempt {attempt + 1}: JSON parse error: {e}, retrying...")
-                    response = generator.run(prompt)['replies'][0]
+                    response = _run_generator()
                 else:
-                    logger.error(f"All {max_retries + 1} attempts failed. Last response: {response[:200]}...")
+                    logger.error(f"All {max_retries + 1} attempts failed. Last response: {str(response)[:200]}...")
                     raise
     
     @classmethod
     def safe_parse(
         cls,
-        response: str,
+        response: Any,
         fallback: Optional[dict] = None
     ) -> Optional[dict]:
         """

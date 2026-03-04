@@ -16,6 +16,7 @@ from src.utils.llm_json_handler import LLMJsonHandler
 from src.utils.weaviate_utils import fetch_by_node_id
 from src.utils.dependency_graph import DependencyGraph
 from src.utils.modelGenerator import ModelGenerator
+from haystack.dataclasses import ChatMessage
 from prompts import doc_creator_prompt as DOCUMENTATION_PROMPT
 from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
 from src.utils.definitions import API_METHODS
@@ -61,9 +62,9 @@ class DocumentationCreator:
         
         return "\n".join(context_parts) if context_parts else "No dependency context found."
     
-    def _build_prompt(self, method: Dict, dependencies_context: str) -> str:
+    def _build_prompt(self, method: Dict, dependencies_context: str) -> ChatMessage:
         """Build the LLM prompt for documentation generation."""
-        return DOCUMENTATION_PROMPT.substitute(
+        prompt =  DOCUMENTATION_PROMPT.substitute(
             controller_name=method.get("class_name", "Unknown"),
             method_name=method.get("method_name", "unknown"),
             http_method=method.get("method_type", "GET"),
@@ -72,6 +73,8 @@ class DocumentationCreator:
             method_definition=method.get("method_definition", ""),
             dependencies_context=dependencies_context
         )
+
+        return ChatMessage.from_system(prompt)
     
   
   

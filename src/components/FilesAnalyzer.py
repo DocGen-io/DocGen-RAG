@@ -66,11 +66,13 @@ class FilesAnalyzer:
         """Analyzes a single file and returns the structured JSON output."""
         logger.info(f"Analyzing file: {file_path} with thread #{threading.get_ident()}")
     
+        from haystack.dataclasses import ChatMessage
         content_str = "".join(content)
         query = file_analyzer_prompt.substitute(query_data_file_path=file_path, query_data_file_content=content_str)
+        chat_msg = ChatMessage.from_user(query)
         
         # 2. Get LLM response
-        response = self.model_generator.run(query)['replies'][0]
+        response = self.model_generator.run(messages=[chat_msg])['replies'][0]
         
         # 3. Parse response
         json_output = LLMJsonHandler.parse_with_retry(

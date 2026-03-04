@@ -36,7 +36,7 @@ class FetchExampleGenerator:
         llm_type = "fetch_example_generator" if "fetch_example_generator" in config else "doc_creator"
         self.generator = ModelGenerator(llm_type, config_path).get_generator()
 
-    def _build_prompt(self, swagger: Dict[str, Any]) -> str:
+    def _build_prompt(self, swagger: Dict[str, Any]):
         """Build prompt from swagger data."""
         params = swagger.get("parameters", [])
         params_str = json.dumps(params, indent=2) if params else "None"
@@ -44,13 +44,15 @@ class FetchExampleGenerator:
         request_body = swagger.get("requestBody", {})
         body_str = json.dumps(request_body, indent=2) if request_body else "None"
 
-        return fetch_example_prompt.substitute(
+        prompt_str = fetch_example_prompt.substitute(
             http_method=swagger.get("method", "GET").upper(),
             endpoint_path=swagger.get("path", "/"),
             summary=swagger.get("summary", ""),
             parameters=params_str,
             request_body=body_str,
         )
+        from haystack.dataclasses import ChatMessage
+        return ChatMessage.from_user(prompt_str)
 
     @component.output_types(examples=Dict[str, str])
     def run(self, swagger_data: Dict[str, Any]) -> Dict[str, Any]:

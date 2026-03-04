@@ -7,7 +7,7 @@ and temperature parameters via generation_kwargs.
 """
 
 from typing import Any, Dict, Optional
-from haystack_integrations.components.generators.ollama import OllamaGenerator
+from haystack_integrations.components.generators.ollama import OllamaChatGenerator
 from haystack_integrations.components.generators.google_genai import (
     GoogleGenAIChatGenerator,
 )
@@ -76,8 +76,8 @@ class ModelGenerator:
                 f"Could not boot the {self.active_provider} generator."
             ) from e
 
-    def _create_ollama(self, model: str, url: str, generation_kwargs: dict[str, Any] | None = None) -> OllamaGenerator:
-        """Create OllamaGenerator with schema in generation_kwargs."""
+    def _create_ollama(self, model: str, url: str, generation_kwargs: dict[str, Any] | None = None) -> OllamaChatGenerator:
+        """Create OllamaChatGenerator with schema in generation_kwargs."""
         gen_kwargs = {}
 
         # Schema for constrained decoding, or plain "json" as fallback
@@ -86,7 +86,7 @@ class ModelGenerator:
         if self.temperature is not None:
             gen_kwargs["temperature"] = self.temperature
 
-        return OllamaGenerator(
+        return OllamaChatGenerator(
             model=model,
             url=url,
             generation_kwargs=gen_kwargs,
