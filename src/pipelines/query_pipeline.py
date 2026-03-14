@@ -1,0 +1,100 @@
+"""
+QueryPipeline - Semantic + keyword search over stored endpoint documentation.
+
+Given a natural-language prompt, embeds it and retrieves the top-k most relevant
+endpoint docs from Weaviate using both:
+  - Semantic search (vector similarity)
+  - Keyword (BM25) search
+
+Results are merged and deduplicated before returning.
+"""
+
+from typing import List, Dict, Any
+
+from haystack.components.embedders import SentenceTransformersTextEmbedder
+from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
+from haystack_integrations.components.retrievers.weaviate import (
+    WeaviateEmbeddingRetriever,
+    WeaviateBM25Retriever,
+)
+
+from src.utils.config_loader import load_config
+from src.utils.logger import DocGenLogger
+
+logger = DocGenLogger(__name__)
+
+# Filter: only endpoint documentation (not raw code chunks)
+_ENDPOINT_DOC_FILTER = {
+    "field": "meta.doc_type",
+    "operator": "==",
+    "value": "endpoint_documentation",
+}
+
+
+class QueryPipeline:
+    """
+    Retrieves the most relevant API endpoints from Weaviate for a user query.
+
+    Uses both semantic (embedding) and keyword (BM25) retrieval then
+    merges/deduplicates by endpoint path+method.
+    """
+
+    def __init__(self, config_path: str = "config.yaml"):
+        config = load_config(config_path)
+        weaviate_url = config.get("WEAVIATE_URL") or "http://127.0.0.1:8080"
+        rag = config.get("rag", {})
+
+        self.top_k = rag.get("top_k_retriever", 10)
+        embedding_model = rag.get("embedding_model", "sentence-transformers/all-MiniLM-L6-v2")
+
+        self.doc_store = WeaviateDocumentStore(url=weaviate_url)
+        self.embedder = SentenceTransformersTextEmbedder(model=embedding_model)
+        self.embedder.warm_up()
+
+        self.semantic_retriever = WeaviateEmbeddingRetriever(
+            document_store=self.doc_store,
+            top_k=self.top_k,
+            filters=_ENDPOINT_DOC_FILTER,
+        )
+        self.keyword_retriever = WeaviateBM25Retriever(
+            document_store=self.doc_store,
+            top_k=self.top_k,
+            filters=_ENDPOINT_DOC_FILTER,
+        )
+
+    def run(self, query: str) -> List[Dict[str, Any]]:
+        """
+        Search for API endpoints matching the given natural-language query.
+
+        Args:
+            query: Free-text description, e.g. "user authentication endpoint".
+
+        Returns:
+            List of endpoint dicts (path, method, summary, content) ordered by relevance.
+        """
+        logger.info(f"QueryPipeline: querying for '{query}'", location="run")
+
+        # Semantic retrieval
+        embedding = self.embedder.run(text=query)["embedding"]
+        semantic_docs = self.semantic_retriever.run(query_embedding=embedding).get("documents", [])
+
+        # Keyword retrieval
+        keyword_docs = self.keyword_retriever.run(query=query).get("documents", [])
+
+        # Merge and deduplicate by (path, method)
+        seen: set = set()
+        merged: List[Dict[str, Any]] = []
+        for doc in semantic_docs + keyword_docs:
+            key = (doc.meta.get("path", ""), doc.meta.get("method", ""))
+            if key not in seen:
+                seen.add(key)
+                merged.append({
+                    "path": doc.meta.get("path", ""),
+                    "method": doc.meta.get("method", ""),
+                    "summary": doc.meta.get("summary", ""),
+                    "content": doc.content,
+                    "score": doc.score,
+                })
+
+        logger.info(f"QueryPipeline: returned {len(merged)} unique endpoints", location="run")
+        return merged

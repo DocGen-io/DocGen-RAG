@@ -88,7 +88,8 @@ class DocumentationCreator:
     def run(
         self,
         endpoint_graphs: Optional[Dict[str, Any]] = None,
-        project_name: str = ""
+        project_name: str = "",
+        wait_for_weaviate: Optional[int] = None
     ) -> Dict[str, Any]:
         """
         Process EndpointGraphs, fetch code context, and generate API documentation.
