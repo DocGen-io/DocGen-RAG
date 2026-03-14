@@ -38,7 +38,7 @@ class SourceHandler:
         files=List[Dict[str, str]],
         working_dir=str,
     )
-    def run(self, source_type: str, path: str, credentials: Optional[str] = None) -> Dict[str, Any]:
+    def run(self, source_type: str, path: str, credentials: Optional[str] = None, api_dir: Optional[str] = None) -> Dict[str, Any]:
         """
         Process input source and collect file paths.
         
@@ -46,13 +46,18 @@ class SourceHandler:
             source_type: "git" or "local"
             path: Repository URL or local folder path
             credentials: Optional git credentials
-            
+            api_dir: Optional path to the api directory (for monorepos)
         Returns:
             Dictionary containing collected files and the working directory.
         """
         working_dir = self._prepare_working_directory(source_type, path, credentials)
         
         self._apply_local_llmignore(working_dir)
+
+        # Analyze api directory, in-case of monorepo
+
+        if(api_dir):
+            working_dir= os.path.join(working_dir,api_dir)
         files = self._collect_files(working_dir)
 
         if not files:

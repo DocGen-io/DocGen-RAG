@@ -39,6 +39,7 @@ class IngestionPipeline:
         path: str,
         project_name: str,
         credentials: Optional[str] = None,
+        api_dir: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Fetch and hash source files.
@@ -56,6 +57,7 @@ class IngestionPipeline:
                     "source_type": source_type,
                     "path": path,
                     "credentials": credentials,
+                    "api_dir": api_dir,
                 },
                 "file_hasher": {"project_name": project_name},
             },

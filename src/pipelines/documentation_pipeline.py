@@ -61,6 +61,7 @@ class DocumentationPipeline:
         source_type: str,
         path: str,
         credentials: Optional[str] = None,
+        api_dir: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Run the full documentation generation pipeline.
@@ -88,6 +89,7 @@ class DocumentationPipeline:
                 path=path,
                 project_name=project_name,
                 credentials=credentials,
+                api_dir=api_dir,
             )
             files = ingestion_out["files"]
             pending_hashes = ingestion_out["pending_hashes"]
@@ -129,14 +131,21 @@ def main():
     source_type = "local"
     path = "apis-test/nestjs"
 
-    if len(sys.argv) == 3:
+    if len(sys.argv) >= 3:
         source_type = sys.argv[1]
         path = sys.argv[2]
+        if len(sys.argv) >= 4:
+            api_dir = sys.argv[3]
+        else:
+            api_dir = None
     elif len(sys.argv) == 2:
         path = sys.argv[1]
+        api_dir = None
+    else:
+        api_dir = None
 
     pipeline = DocumentationPipeline()
-    result = pipeline.run(source_type=source_type, path=path)
+    result = pipeline.run(source_type=source_type, path=path, api_dir=api_dir)
 
     print("\n=== Pipeline Result ===")
     for key, value in result.items():
