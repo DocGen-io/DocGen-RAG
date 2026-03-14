@@ -52,8 +52,6 @@ class IndexingPipeline:
         )
         self.pipeline.add_component("file_hash_saver", FileHashSaver())
 
-        # Weaviate code write (parallel with graph manager — both need files)
-        self.pipeline.connect("weaviate_writer.documents_written", "graph_manager.documents_written")
         # Graph -> doc creator
         self.pipeline.connect("graph_manager.endpoint_graphs", "doc_creator.endpoint_graphs")
         # Doc creator -> merger
