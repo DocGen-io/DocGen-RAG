@@ -180,6 +180,8 @@ class EndpointGraphManager:
         self._init_db()
         
         all_components = {}
+        # name_index maps dependency_name -> component_id for resolution
+        name_index: Dict[str, str] = {}
         endpoints = []
         
         # 1. First sweep to locate endpoints and index all components for fast lookup
@@ -200,6 +202,9 @@ class EndpointGraphManager:
                 item_with_context["_source_file_path"] = file_path
                 all_components[component_id] = item_with_context
                 
+                # Index by name for dependency resolution
+                name_index[name] = component_id
+                
                 if item.get("is_api_method") and str(item.get("type", "")).lower() == "function":
                     endpoints.append(component_id)
                     
@@ -209,18 +214,38 @@ class EndpointGraphManager:
             self.endpoint_graphs[endpoint_id] = graph
             
             # DFS/BFS traverse through the stored components
-            self._populate_subgraph(graph, endpoint_id, all_components, set())
+            self._populate_subgraph(graph, endpoint_id, all_components, name_index, set())
             
             # 3. Sync to database
             self._sync_graph_to_db(endpoint_id, graph)
             
         return {"endpoint_graphs": self.endpoint_graphs}
             
+    def _resolve_dependency(self, dep: Any, name_index: Dict[str, str], current_file_path: str) -> str:
+        """Resolve a dependency to the actual indexed component ID using the name_index."""
+        dep_name = None
+        if isinstance(dep, dict):
+            dep_name = dep.get('dependency_name', '')
+        elif isinstance(dep, str):
+            try:
+                parsed = json.loads(dep)
+                dep_name = parsed.get('dependency_name', '')
+            except Exception:
+                dep_name = dep
+        
+        # Look up by name in the index — this returns the SAME id used in Weaviate
+        if dep_name and dep_name in name_index:
+            return name_index[dep_name]
+        
+        # Only if not found in index, fabricate an ID (will be a dead-end in traversal)
+        return self._parse_dependency_id(dep, current_file_path)
+
     def _populate_subgraph(
         self, 
         graph: DependencyGraph, 
         current_node_id: str, 
         all_components: Dict[str, Any], 
+        name_index: Dict[str, str],
         visited: Set[str]
     ) -> None:
         """Recursively pulls nested dependencies into the start node's graph."""
@@ -235,11 +260,11 @@ class EndpointGraphManager:
             
         source_file_path = item.get("_source_file_path", "")
         raw_deps = item.get("dependencies", [])
-        string_deps = [self._parse_dependency_id(d, source_file_path) for d in raw_deps]
+        string_deps = [self._resolve_dependency(d, name_index, source_file_path) for d in raw_deps]
         
         # Apply the fast graph update
         graph.update_dependencies(current_node_id, string_deps)
         
         # Recurse
         for target_id in string_deps:
-            self._populate_subgraph(graph, target_id, all_components, visited)
+            self._populate_subgraph(graph, target_id, all_components, name_index, visited)
