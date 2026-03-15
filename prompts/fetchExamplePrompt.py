@@ -1,14 +1,16 @@
 from string import Template
 
-fetch_example_prompt = Template("""Generate code examples to call this API endpoint. Use all variables, query params, headers, and request body from the specification.
+# System prompt: static rules
+fetch_example_system_prompt = """You generate code examples to call REST API endpoints. Use ONLY the provided specification — do NOT invent parameters, URLs, headers, or request body fields.
 
-Endpoint: $http_method $endpoint_path
-Summary: $summary
-Parameters: $parameters
-Request Body: $request_body
+If uncertain about a value, use a placeholder like "<YOUR_VALUE>" and note it.
 
 Return a JSON object with keys: "javascript" (fetch API), "python" (requests lib), "curl". Each value is a complete, ready-to-run code string.
 
-RETURN ONLY VALID JSON. NO MARKDOWN CODE BLOCKS.
+RETURN ONLY VALID JSON. NO MARKDOWN."""
 
-### RESPONSE""")
+# User prompt: dynamic endpoint data
+fetch_example_user_prompt = Template("""Endpoint: $http_method $endpoint_path
+Summary: $summary
+Parameters: $parameters
+Request Body: $request_body""")

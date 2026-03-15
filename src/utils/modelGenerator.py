@@ -85,8 +85,8 @@ class ModelGenerator:
         # Schema for constrained decoding, or plain "json" as fallback
         gen_kwargs["format"] = self.format_schema if self.format_schema else "json"
 
-        if self.temperature is not None:
-            gen_kwargs["temperature"] = self.temperature
+        # Default to temperature=0 for deterministic output
+        gen_kwargs["temperature"] = self.temperature if self.temperature is not None else 0
             
         if self.seed is not None:
             gen_kwargs["seed"] = self.seed
@@ -98,5 +98,18 @@ class ModelGenerator:
         )
 
     def _create_gemini(self, model: str) -> GoogleGenAIChatGenerator:
-        """Create Google Gemini chat generator."""
-        return GoogleGenAIChatGenerator(model=model)
+        """Create Google Gemini chat generator with deterministic settings."""
+        gen_kwargs: Dict[str, Any] = {
+            "temperature": self.temperature if self.temperature is not None else 0,
+            "top_p": 0.1,
+            "response_mime_type": "application/json",
+            "thinking_budget": 0,
+        }
+
+        if self.seed is not None:
+            gen_kwargs["seed"] = self.seed
+
+        if self.format_schema:
+            gen_kwargs["response_schema"] = self.format_schema
+
+        return GoogleGenAIChatGenerator(model=model, generation_kwargs=gen_kwargs)

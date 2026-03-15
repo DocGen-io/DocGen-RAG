@@ -17,7 +17,7 @@ from src.utils.weaviate_utils import fetch_by_node_id
 from src.utils.dependency_graph import DependencyGraph
 from src.utils.modelGenerator import ModelGenerator
 from haystack.dataclasses import ChatMessage
-from prompts import doc_creator_prompt as DOCUMENTATION_PROMPT
+from prompts import doc_creator_system_prompt, doc_creator_user_prompt
 from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
 from src.utils.definitions import API_METHODS
 logger = DocGenLogger(__name__)
@@ -62,19 +62,56 @@ class DocumentationCreator:
         
         return "\n".join(context_parts) if context_parts else "No dependency context found."
     
-    def _build_prompt(self, method: Dict, dependencies_context: str) -> ChatMessage:
-        """Build the LLM prompt for documentation generation."""
-        prompt =  DOCUMENTATION_PROMPT.substitute(
+    def _fetch_type_context(self, code_text: str, dep_context: str) -> str:
+        """Extract PascalCase type names (DTOs/interfaces) from code and fetch their definitions."""
+        import re
+        # Match PascalCase names that look like DTOs/interfaces (2+ capital letters, ending in Dto/Response/Request/etc)
+        type_pattern = re.compile(r'\b([A-Z][a-zA-Z]*(?:Dto|Response|Request|Entity|Model|Interface|Type|Schema))\b')
+        combined_text = f"{code_text}\n{dep_context}"
+        type_names = set(type_pattern.findall(combined_text))
+        
+        if not type_names:
+            return ""
+        
+        type_parts = []
+        fetched = set()
+        for type_name in type_names:
+            if type_name in fetched:
+                continue
+            try:
+                docs = self.document_store.filter_documents(filters={
+                    "field": "meta.name",
+                    "operator": "==",
+                    "value": type_name
+                })
+                if docs:
+                    fetched.add(type_name)
+                    type_parts.append(f"**{type_name}**:\n{docs[0].content}\n")
+            except Exception as e:
+                logger.debug(f"Could not fetch type {type_name}: {e}")
+        
+        return "\n".join(type_parts) if type_parts else ""
+    
+    def _build_prompt(self, method: Dict, dependencies_context: str, type_context: str = "") -> List[ChatMessage]:
+        """Build system + user messages for documentation generation."""
+        full_context = dependencies_context
+        if type_context:
+            full_context += f"\n\nType Definitions (DTOs, interfaces, schemas):\n{type_context}"
+        
+        user_prompt = doc_creator_user_prompt.substitute(
             controller_name=method.get("class_name", "Unknown"),
             method_name=method.get("method_name", "unknown"),
             http_method=method.get("method_type", "GET"),
             endpoint_path=method.get("method_path", "/"),
             base_path=method.get("base_path", "/"),
             method_definition=method.get("method_definition", ""),
-            dependencies_context=dependencies_context
+            dependencies_context=full_context
         )
 
-        return ChatMessage.from_system(prompt)
+        return [
+            ChatMessage.from_system(doc_creator_system_prompt),
+            ChatMessage.from_user(user_prompt)
+        ]
     
   
   
@@ -160,17 +197,20 @@ class DocumentationCreator:
                     continue
                     
                 method_info = {
-                    "class_name": meta.get("class_name", endpoint_id.split(":")[1] if len(endpoint_id.split(":")) > 1 else "Unknown"),
-                    "method_name": meta.get("name", endpoint_id.split(":")[2] if len(endpoint_id.split(":")) > 2 else "unknown"),
+                    "class_name": meta.get("class_name") or (endpoint_id.split(":")[1] if len(endpoint_id.split(":")) > 1 else "Unknown"),
+                    "method_name": meta.get("name") or (endpoint_id.split(":")[2] if len(endpoint_id.split(":")) > 2 else "unknown"),
                     "method_type": raw_method_type.lower(),
                     # LLM writes 'path', fallback to 'method_path' for older docs
-                    "method_path": api_details.get("path", api_details.get("method_path", "/")),
-                    "base_path": api_details.get("base_path", "/"),
+                    "method_path": api_details.get("path") or api_details.get("method_path") or "/",
+                    "base_path": api_details.get("base_path") or "/",
                     "method_definition": endpoint_doc.content
                 }
                 
-                # 4. Build prompt and generate
-                prompt = self._build_prompt(method_info, dep_context)
+                # 4. Fetch type definitions (DTOs/interfaces) referenced in the code
+                type_context = self._fetch_type_context(endpoint_doc.content, dep_context)
+                
+                # 5. Build prompt and generate
+                prompt = self._build_prompt(method_info, dep_context, type_context)
                 documentation = LLMJsonHandler.parse_with_retry(generator=self.generator, prompt=prompt,max_retries=3)
                 
                 if documentation:
