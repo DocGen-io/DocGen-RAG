@@ -15,7 +15,7 @@ from src.utils.logger import DocGenLogger
 from src.utils.config_loader import load_config
 from src.utils.modelGenerator import ModelGenerator
 from src.utils.llm_json_handler import LLMJsonHandler
-from prompts.fetchExamplePrompt import fetch_example_prompt
+from prompts import fetch_example_system_prompt, fetch_example_user_prompt
 
 logger = DocGenLogger(__name__)
 
@@ -37,14 +37,14 @@ class FetchExampleGenerator:
         self.generator = ModelGenerator(llm_type, config_path).get_generator()
 
     def _build_prompt(self, swagger: Dict[str, Any]):
-        """Build prompt from swagger data."""
+        """Build system + user messages from swagger data."""
         params = swagger.get("parameters", [])
         params_str = json.dumps(params, indent=2) if params else "None"
 
         request_body = swagger.get("requestBody", {})
         body_str = json.dumps(request_body, indent=2) if request_body else "None"
 
-        prompt_str = fetch_example_prompt.substitute(
+        user_prompt = fetch_example_user_prompt.substitute(
             http_method=swagger.get("method", "GET").upper(),
             endpoint_path=swagger.get("path", "/"),
             summary=swagger.get("summary", ""),
@@ -52,7 +52,10 @@ class FetchExampleGenerator:
             request_body=body_str,
         )
         from haystack.dataclasses import ChatMessage
-        return ChatMessage.from_user(prompt_str)
+        return [
+            ChatMessage.from_system(fetch_example_system_prompt),
+            ChatMessage.from_user(user_prompt)
+        ]
 
     @component.output_types(examples=Dict[str, str])
     def run(self, swagger_data: Dict[str, Any]) -> Dict[str, Any]:

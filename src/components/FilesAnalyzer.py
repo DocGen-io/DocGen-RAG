@@ -9,7 +9,7 @@ from string import Template
 import threading
 from src.utils.config_loader import load_config
 from src.utils.llm_json_handler import LLMJsonHandler
-from prompts import file_analyzer_prompt
+from prompts import file_analyzer_system_prompt, file_analyzer_user_prompt
 from opentelemetry import context
 import json
 logger = DocGenLogger()
@@ -67,17 +67,23 @@ class FilesAnalyzer:
     
         from haystack.dataclasses import ChatMessage
         content_str = "".join(content)
-        query = file_analyzer_prompt.substitute(query_data_file_path=file_path, query_data_file_content=content_str)
-        chat_msg = ChatMessage.from_user(query)
+        user_prompt = file_analyzer_user_prompt.substitute(
+            query_data_file_path=file_path,
+            query_data_file_content=content_str
+        )
+        messages = [
+            ChatMessage.from_system(file_analyzer_system_prompt),
+            ChatMessage.from_user(user_prompt)
+        ]
         
         # 2. Get LLM response
-        response = self.model_generator.run(messages=[chat_msg])['replies'][0]
+        response = self.model_generator.run(messages=messages)['replies'][0]
         
         # 3. Parse response
         json_output = LLMJsonHandler.parse_with_retry(
             response, 
             generator=self.model_generator, 
-            prompt=query,
+            prompt=messages,
             max_retries=2
         )
         

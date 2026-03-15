@@ -9,6 +9,8 @@ import re
 import json
 from src.utils.logger import DocGenLogger
 from typing import Optional, Any, Callable
+from haystack.dataclasses import ChatMessage
+
 
 logger = DocGenLogger(__name__)
 
@@ -136,12 +138,14 @@ class LLMJsonHandler:
         """
         
         def _run_generator():
+            # Handle prompt as List[ChatMessage], single ChatMessage, or str
+            if isinstance(prompt, list):
+                return generator.run(messages=prompt)['replies'][0]
             try:
                 # Try as text generator (e.g., OllamaGenerator)
                 return generator.run(prompt)['replies'][0]
             except TypeError:
                 # Fallback for chat generators
-                from haystack.dataclasses import ChatMessage
                 msg = prompt if isinstance(prompt, ChatMessage) else ChatMessage.from_user(prompt)
                 return generator.run(messages=[msg])['replies'][0]
                 
