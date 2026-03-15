@@ -52,6 +52,8 @@ class IndexingPipeline:
         )
         self.pipeline.add_component("file_hash_saver", FileHashSaver())
 
+        # Weaviate writer must finish BEFORE doc creator queries Weaviate
+        self.pipeline.connect("weaviate_writer.documents_written", "doc_creator.wait_for_weaviate")
         # Graph -> doc creator
         self.pipeline.connect("graph_manager.endpoint_graphs", "doc_creator.endpoint_graphs")
         # Doc creator -> merger
