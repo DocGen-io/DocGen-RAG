@@ -58,6 +58,8 @@ class SourceHandler:
 
         if(api_dir):
             working_dir= os.path.join(working_dir,api_dir)
+            # Ensure .llmignore is available in the api subdirectory too
+            self._apply_local_llmignore(working_dir)
         files = self._collect_files(working_dir)
 
         if not files:
