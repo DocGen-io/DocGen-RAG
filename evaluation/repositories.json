@@ -1,0 +1,92 @@
+[
+    {
+        "language": "typescript",
+        "api_documentation_url": "https://github.com/realworld-apps/realworld/blob/main/specs/api/openapi.yml",
+        "repos": [
+            {
+                "uses": "Express & Firestore",
+                "repo_url": "https://github.com/marcusmonteirodesouza/typescript-firestore-terraform-realworld-backend"
+            },
+            {
+                "uses": "Express + Knex.js + AWS Lambda",
+                "repo_url": "https://github.com/kenyipp/realworld-nodejs-example-app"
+            },
+            {
+                "uses": "Express + PostgreSQL + Drizzle + Docker",
+                "repo_url": "https://github.com/AhmedFawzy31/realworld-express-postgresql-drizzle"
+            },
+            {
+                "uses": "Neo4j + NestJS",
+                "repo_url": "https://github.com/neo4j-examples/nestjs-neo4j-realworld-example"
+            },
+            {
+                "uses": "NestJS + MikroORM",
+                "repo_url": "https://github.com/mikro-orm/nestjs-realworld-example-app"
+            },
+            {
+                "uses": "NestJS + Prisma",
+                "repo_url": "https://www.geeksforgeeks.org/dsa/prims-minimum-spanning-tree-mst-greedy-algo-5/"
+            },
+            {
+                "uses": "NestJS + Prisma + MongoDB",
+                "repo_url": "https://www.geeksforgeeks.org/dsa/prims-minimum-spanning-tree-mst-greedy-algo-5/"
+            },
+            {
+                "uses": "NestJS + TypeORM",
+                "repo_url": "https://github.com/lujakob/nestjs-realworld-example-app"
+            },
+            {
+                "uses": "Nitro + Prisma + Zod",
+                "repo_url": "https://github.com/realworld-apps/nitro-prisma-zod-realworld-example-app"
+            }
+        ]
+    },
+    {
+        "language": "Java",
+        "api_documentation_url": "https://github.com/realworld-apps/realworld/blob/main/specs/api/openapi.yml",
+        "repos": [
+            {
+                "uses": "Spring Boot + MyBatis",
+                "repo_url": "https://github.com/joyheros/realworld"
+            },
+            {
+                "uses": "Spring Boot + Spring Data JDBC",
+                "repo_url": "https://github.com/alexey-lapin/realworld-backend-spring"
+            },
+            {
+                "uses": "Spring Boot + Spring Data JPA + DDD",
+                "repo_url": "https://github.com/borovikovd/realworld-backend-spring-ddd"
+            },
+            {
+                "uses": "Spring Boot + Spring Data JPA + PostgreSQL",
+                "repo_url": "https://github.com/marcusmonteirodesouza/realworld-backend-spring-boot-java-keycloak-postgresql"
+            },
+            {
+                "uses": "Spring Boot + WebFlux + MongoDB",
+                "repo_url": "https://github.com/a-mountain/realworld-spring-webflux"
+            }
+        ]
+    },
+    {
+        "language": "C#",
+        "api_documentation_url": "https://github.com/realworld-apps/realworld/blob/main/specs/api/openapi.yml",
+        "repos": [
+            {
+                "uses": ".NET + Minimal API",
+                "repo_url": "https://github.com/Erikvdv/realworldapiminimal"
+            },
+            {
+                "uses": "ASP.NET Core",
+                "repo_url": "https://github.com/gothinkster/aspnetcore-realworld-example-app"
+            },
+            {
+                "uses": "ASP.NET Core + Couchbase",
+                "repo_url": "https://github.com/mgroves/realworld-aspnet-couchbase"
+            },
+            {
+                "uses": "ASP.NET Core + Microservices",
+                "repo_url": "https://github.com/profjordanov/realworld-microservices"
+            }
+        ]
+    }
+]
