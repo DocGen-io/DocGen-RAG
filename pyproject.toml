@@ -33,6 +33,7 @@ dependencies = [
     "gitignore-parser>=0.1.13",
     "scikit-learn",
     "numpy",
+    "openapi-schema-validator>=0.8.1",
 ]
 
 [project.scripts]

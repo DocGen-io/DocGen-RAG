@@ -3,7 +3,8 @@
 /.vscode
 **/__pycache__
 .env
-data
+/data
+/notes
 ast
 docgen_rag.egg-info
 .venv
@@ -15,3 +16,7 @@ analyzer_output
 
 
 dependencies.db
+
+
+evaluation/ground_truths    
+.agents
