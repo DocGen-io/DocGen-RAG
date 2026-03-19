@@ -10,13 +10,14 @@ ABSOLUTE RULES:
 4. If you are uncertain about any field, set its value to null and add "x-uncertain": true to that object.
 5. `responses` MUST be a dict of HTTP status codes, never a list. Example: {"200": {...}, "400": {...}}.
 6. Parameters use `schema` object: {"schema": {"type": "string"}}. No top-level `type`.
-7. No $ref — inline every schema with `properties`, `type`, `description`, AND A REALISTIC `example` VALUE.
-8. EVERY property inside a schema MUST have an `example` field (e.g. "gameType": {"type": "string", "example": "501"}). If you omit `example`, Swagger UI will render empty objects `[{}]`.
+7. No $ref — inline every schema with `properties`, `type`, `description`. Only add an `example` value if it is clearly derivable from the code or DTO definition — do NOT fabricate or guess. If uncertain, omit `example` entirely.
+8. Only add `example` values to properties where the value is evident (e.g., from a DTO decorator like `@ApiProperty({example: X})` or from an obvious constant in the code). When in doubt, omit — an empty Swagger UI is better than a wrong example.
 9. If context is empty/missing, return {"insufficient_context": true}.
 10. `requestBody` format: {"content": {"application/json": {"schema": {"type": "object", "properties": {...}}}}}.
 11. DTO PARSING & DECORATORS: For NestJS DTOs, parse decorators: `@IsOptional()` means NOT required. `@Min(X)` -> `minimum: X`, `@Max(Y)` -> `maximum: Y`. `@ApiProperty({default: X})` -> `default: X`.
-12. QUERY vs BODY: If the endpoint is GET/DELETE, complex DTOs (like PaginationQueryDto) map to an ARRAY of `parameters` (in: "query"), NOT a `requestBody`. Only POST/PUT/PATCH should have `requestBody`.
+12. QUERY vs BODY: If the endpoint is GET/DELETE, each field of a DTO used as a query parameter must become its OWN individual `parameters` entry (one entry per field) with `in: "query"`. NEVER wrap the entire DTO as a single parameter object. Example: `PaginationQueryDto` with fields `page` and `limit` -> two separate params named `page` and `limit`. Only POST/PUT/PATCH should have `requestBody`.
 13. GENERICS: If a return type is generic like `PaginatedResponseDto<Game>`, resolve the generic parameter `T`. E.g., if PaginatedResponseDto has `data: T[]`, the schema must show an array of `Game` objects for the `data` field.
+14. RESPONSE SCHEMA: Only include a response schema with `content` if the return type and its fields are explicitly visible in the provided code or type definitions. If the return type is a DTO that you do not have a definition for, or it is simply unknown, emit the response as `{"200": {"description": "OK"}}` with NO `content` key — do NOT fabricate properties or examples.
 
 DESCRIPTION REQUIREMENTS:
 - Write a detailed, natural-language description explaining: what the endpoint does, how it processes data, what the data flow looks like, any side effects, authentication requirements, and edge cases.

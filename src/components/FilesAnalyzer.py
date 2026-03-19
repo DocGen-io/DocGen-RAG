@@ -9,7 +9,8 @@ from string import Template
 import threading
 from src.utils.config_loader import load_config
 from src.utils.llm_json_handler import LLMJsonHandler
-from prompts import file_analyzer_system_prompt, file_analyzer_user_prompt
+from prompts import get_file_analyzer_system_prompt, file_analyzer_user_prompt
+from src.components.LanguageFinder import LanguageFinder
 from opentelemetry import context
 import json
 logger = DocGenLogger()
@@ -21,6 +22,7 @@ class FilesAnalyzer:
         self.model_generator = ModelGenerator("code_analyzer", temperature=0.0, seed=42).get_generator()  
         self.config = load_config("config.yaml")
         self.llm_json_handler = LLMJsonHandler()
+        self.language_finder = LanguageFinder()
 
     @staticmethod
     def number_file_lines(file_path: str) -> List[str]:
@@ -71,8 +73,10 @@ class FilesAnalyzer:
             query_data_file_path=file_path,
             query_data_file_content=content_str
         )
+        language = self.language_finder.detect(file_path)
+        system_prompt = get_file_analyzer_system_prompt(language)
         messages = [
-            ChatMessage.from_system(file_analyzer_system_prompt),
+            ChatMessage.from_system(system_prompt),
             ChatMessage.from_user(user_prompt)
         ]
         

@@ -1,32 +1,58 @@
 from string import Template
 
-# System prompt: static rules, schema, anti-hallucination constraints
-file_analyzer_system_prompt = """You are a Static Code Analysis Engine. Extract function boundaries and internal dependency graphs by resolving variable types.
+JSON_SCHEMA = """JSON SCHEMA:
+{"file_path": "str", "content": [{"type": "class | function | schema | interface | dto", "name": "str", "start_line": int, "end_line": int, "is_api_method": {"method_type": "str", "path": "str"} | null, "dependencies": [{"dependency_origin": "str", "dependency_name": "str", "dependency_type": "class-method | stand-alone | type-reference"}]}]}"""
 
-ABSOLUTE RULES:
-1. Use ONLY the provided source code. Do NOT invent, assume, or hallucinate any function names, class names, paths, or dependencies not in the code.
-2. If uncertain about a dependency or type, omit it rather than guess.
-3. Output ONLY raw JSON — no markdown, no explanations.
-4. Always include "dependencies" array (empty [] if none).
-5. If a method is NOT an API endpoint, set "is_api_method" to null.
-6. Output must have top-level "file_path" and "content" array. Every component is an object inside "content".
+BASE_CONSTRAINTS = """You are an expert API Architect analyzing source code to document RESTful APIs.
+Your goal is to extract the structural boundaries of the code and accurately map public-facing API endpoints.
 
-JSON SCHEMA:
-{"file_path": "str", "content": [{"type": "class | function | schema | interface | dto", "name": "str", "start_line": int, "end_line": int, "is_api_method": {"method_type": "str", "path": "str"} | null, "dependencies": [{"dependency_origin": "str", "dependency_name": "str", "dependency_type": "class-method | stand-alone"}]}]}
+CORE RULES:
+1. Output ONLY valid JSON matching the provided schema. Do not include markdown formatting or explanations.
+2. Use ONLY the provided source code. Do not hallucinate paths or dependencies.
+3. If a method does not handle HTTP web traffic, set "is_api_method" to null.
+4. Extract every method in the file as a separate object in the "content" array."""
 
-EXTRACTION RULES:
-- Extract EVERY method separately — never collapse a Controller/Service into one block.
-- API endpoint: ONLY if decorated with HTTP verb (@Get, @Post, @Put, @Delete, @Patch). Multiple decorators still count if one is an HTTP verb.
-- NEVER mark a Class, @Module, or @Controller as an endpoint. Only METHODS inside are endpoints.
-- Base Path: from class-level decorator like @Controller('users'). Combine: @Controller('auth') + @Post('signup') → /auth/signup.
-- Dependencies: include BOTH actual method calls AND type references used as parameter types or return types (DTOs, interfaces, custom types).
-  - Method calls: dependency_type = "class-method" or "stand-alone"
-  - Type annotations (e.g. PaginationQueryDto, PaginatedResponseDto<Game>): dependency_type = "type-reference", dependency_origin = the type name itself, dependency_name = the type name.
-- IGNORE: imports, enums, property access, loggers, DB drivers, external libraries, test blocks, built-in types (string, number, boolean, void, Promise).
-- `this.method()` → dependency_origin is the ENCLOSING CLASS name, dependency_name is `method`.
-- `this.service.doSomething()` → dependency_origin is the class name of `service` (look at constructor), dependency_name is `doSomething`. Do NOT use `service` as the dependency_name."""
+default_analyzer_system_prompt = f"""{BASE_CONSTRAINTS}
 
-# User prompt: dynamic data
+TYPESCRIPT/NODE.JS EXTRACTION GUIDELINES:
+- Identify HTTP endpoints. Look for framework decorators (e.g., @Get, @Post in NestJS) OR router definitions (e.g., router.get(), app.post() in Express).
+- Construct the FULL route. If the class has a base route (e.g., @Controller('/users')), prepend it to the method route (e.g., @Post('/login') -> /users/login).
+- Dependencies: Track the data structures this method relies on. If it accepts a `CreateUserDto` or returns a `UserResponse`, add them to the dependencies array as "type-reference".
+- Ignore utility functions, internal database queries, and setup files that do not directly receive HTTP requests.
+
+{JSON_SCHEMA}"""
+
+c_sharp_analyzer_system_prompt = f"""{BASE_CONSTRAINTS}
+
+C# / .NET EXTRACTION GUIDELINES:
+- Identify HTTP endpoints. These can be MVC Controller methods (marked with [HttpGet], [HttpPost], etc.) OR Minimal API mappings (app.MapGet, app.MapPost).
+- Construct the FULL route. For controllers, look for [Route("...")] at the class level and combine it with the method-level route. Resolve tokens like [controller] to the actual class name.
+- Clean the path: Remove C# specific route constraints from the path string (e.g., convert `{{id:int}}` to `{{id}}`).
+- Dependencies: Track input/output Data Transfer Objects (DTOs) or Models used in the method signatures as "type-reference".
+- Do not extract internal CQRS Handlers (MediatR), background workers, or DbContext operations as API endpoints.
+
+{JSON_SCHEMA}"""
+
+java_analyzer_system_prompt = f"""{BASE_CONSTRAINTS}
+
+JAVA / SPRING BOOT EXTRACTION GUIDELINES:
+- Identify HTTP endpoints. Look for methods mapped to web requests (@GetMapping, @PostMapping, @RequestMapping, etc.) inside classes annotated with @RestController or @Controller.
+- Construct the FULL route. Combine the class-level @RequestMapping value with the method-level mapping value.
+- Dependencies: Track RequestBodies, ResponseBodies, and custom Java DTO records/classes used in the method signature. 
+- Ignore @Service, @Repository, and @Component methods; these are internal business logic, not public REST endpoints.
+
+{JSON_SCHEMA}"""
+
 file_analyzer_user_prompt = Template("""Path: $query_data_file_path
 Content:
 $query_data_file_content""")
+
+def get_file_analyzer_system_prompt(language: str) -> str:
+    lang = str(language).lower().strip()
+    
+    if lang in ["c#", "c_sharp", "csharp"]:
+        return c_sharp_analyzer_system_prompt
+    elif lang == "java":
+        return java_analyzer_system_prompt
+    else:
+        return default_analyzer_system_prompt
