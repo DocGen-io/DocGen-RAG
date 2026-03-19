@@ -5,7 +5,7 @@ import requests
 import pandas as pd
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, asdict
-
+from datetime import datetime
 from src.pipelines.documentation_pipeline import DocumentationPipeline
 from evaluation.metrics import evaluate_structural_validity, evaluate_accuracy
 from src.utils.logger import DocGenLogger
@@ -70,12 +70,12 @@ def main():
     parser = argparse.ArgumentParser(description="Run automated thesis evaluation harness")
     parser.add_argument("--model", type=str, default="llama3", help="Name of the model being evaluated")
     parser.add_argument("--config", type=str, default="evaluation/repositories.json", help="Path to repositories JSON configuration")
-    parser.add_argument("--output", type=str, default="evaluation/evaluation_results.csv", help="Output file path for evaluation metrics CSV")
+    parser.add_argument("--output", type=str, default="evaluation/data/evaluation_results", help="Output file path for evaluation metrics CSV")
     args = parser.parse_args()
     
     orchestrator = EvaluationOrchestrator(
         repositories_file=args.config,
-        output_file=args.output,
+        output_file=args.output + datetime.now().strftime("%d:%H:%M") + ".csv",
         model_name=args.model
     )
     orchestrator.run()

@@ -1,7 +1,7 @@
 [
     {
         "language": "typescript",
-        "api_documentation_url": "https://github.com/realworld-apps/realworld/blob/main/specs/api/openapi.yml",
+        "api_documentation_url": "https://raw.githubusercontent.com/realworld-apps/realworld/main/specs/api/openapi.yml",
         "repos": [
             {
                 "uses": "Express & Firestore",
@@ -24,14 +24,6 @@
                 "repo_url": "https://github.com/mikro-orm/nestjs-realworld-example-app"
             },
             {
-                "uses": "NestJS + Prisma",
-                "repo_url": "https://www.geeksforgeeks.org/dsa/prims-minimum-spanning-tree-mst-greedy-algo-5/"
-            },
-            {
-                "uses": "NestJS + Prisma + MongoDB",
-                "repo_url": "https://www.geeksforgeeks.org/dsa/prims-minimum-spanning-tree-mst-greedy-algo-5/"
-            },
-            {
                 "uses": "NestJS + TypeORM",
                 "repo_url": "https://github.com/lujakob/nestjs-realworld-example-app"
             },
@@ -43,7 +35,7 @@
     },
     {
         "language": "Java",
-        "api_documentation_url": "https://github.com/realworld-apps/realworld/blob/main/specs/api/openapi.yml",
+        "api_documentation_url": "https://raw.githubusercontent.com/realworld-apps/realworld/main/specs/api/openapi.yml",
         "repos": [
             {
                 "uses": "Spring Boot + MyBatis",
@@ -69,7 +61,7 @@
     },
     {
         "language": "C#",
-        "api_documentation_url": "https://github.com/realworld-apps/realworld/blob/main/specs/api/openapi.yml",
+        "api_documentation_url": "https://raw.githubusercontent.com/realworld-apps/realworld/main/specs/api/openapi.yml",
         "repos": [
             {
                 "uses": ".NET + Minimal API",

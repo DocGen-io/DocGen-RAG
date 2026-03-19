@@ -9,7 +9,7 @@ logger = DocGenLogger(__name__)
 class GroundTruthManager:
     """Manages fetching and loading of the ground truth swagger.json"""
     
-    def __init__(self, download_dir: str = "evaluation"):
+    def __init__(self, download_dir: str = "evaluation/ground_truths"):
         self.download_dir = download_dir
         os.makedirs(self.download_dir, exist_ok=True)
         
