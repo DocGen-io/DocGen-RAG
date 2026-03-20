@@ -1,5 +1,9 @@
 """
-WeaviateCodeWriter - Haystack component to store required code data in Weaviate.
+WeaviateCodeWriter - Haystack component to store code data in Weaviate.
+
+Handles two types of data:
+1. AST-extracted endpoint definitions (from ControllerExtractor)
+2. Structural code chunks (from ASTCodeSplitter)
 """
 
 from haystack import component, Document
@@ -8,7 +12,6 @@ from haystack.document_stores.types import DuplicatePolicy
 from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
 from typing import List, Dict, Any, Optional
 from src.utils.logger import DocGenLogger
-from src.utils.json_loader import load_json_folder
 from src.utils.config_loader import load_config
 import hashlib
 import json
@@ -20,145 +23,157 @@ logger = DocGenLogger(__name__)
 @component
 class WeaviateCodeWriter:
     """
-    Haystack component that writes FilesAnalyzer data to Weaviate.
-    
-    Usage:
-        writer = WeaviateCodeWriter(weaviate_url="http://localhost:8080")
-        result = writer.run(
-            input_folder="./files_analyzer",
-        )
+    Haystack component that writes both endpoint definitions and code chunks
+    to Weaviate for downstream dependency resolution and documentation generation.
     """
-    
+
     def __init__(
         self,
         weaviate_url: str = "http://127.0.0.1:8080",
-        additional_headers: Optional[Dict[str, str]] = None
+        additional_headers: Optional[Dict[str, str]] = None,
     ):
-        """
-        Initialize the WeaviateCodeWriter component.
-        
-        Args:
-            weaviate_url: URL of the Weaviate instance
-            additional_headers: Optional headers for Weaviate (e.g., API keys)
-        """
         self.weaviate_url = weaviate_url
         self.additional_headers = additional_headers or {}
-        self.config = load_config('config.yaml')
-        
-        # Initialize document store
+        self.config = load_config("config.yaml")
+
         self.document_store = WeaviateDocumentStore(
             url=weaviate_url,
-            additional_headers=self.additional_headers
+            additional_headers=self.additional_headers,
         )
-        
-        # Initialize writer — OVERWRITE so re-runs replace old docs, never accumulate
-        self.writer = DocumentWriter(document_store=self.document_store, policy=DuplicatePolicy.OVERWRITE)
-    
-    def analyzed_files_to_documents(self, analyzed_files: List[Dict[str, Any]]) -> List[Document]:
+        self.writer = DocumentWriter(
+            document_store=self.document_store,
+            policy=DuplicatePolicy.OVERWRITE,
+        )
+
+    # ------------------------------------------------------------------
+    # Endpoint definitions → Documents
+    # ------------------------------------------------------------------
+    def endpoints_to_documents(self, endpoints: List[Dict[str, Any]]) -> List[Document]:
         """
-        Convert FilesAnalyzer output to Haystack Documents.
-        
-        Args:
-            analyzed_files: Dictionary mapping file paths to analysis results
-            
-        Returns:
-            List of Haystack Document objects
+        Convert ControllerExtractor endpoint dicts to Haystack Documents.
+
+        Each endpoint becomes a single Document with:
+          - content = method_definition
+          - meta.type = "endpoint_definition"
+          - meta.node_id = file_name:class_name:method_name
         """
         documents = []
-        
+        for ep in endpoints:
+            node_id = ep.get("node_id") or f"{ep.get('file_name', 'unknown')}:{ep.get('class_name', 'Global')}:{ep.get('method_name', 'unknown')}:{ep.get('method_type', 'unknown')}"
+            doc_id = hashlib.sha256(node_id.encode()).hexdigest()
+
+            meta = {
+                "type": "endpoint_definition",
+                "node_id": node_id,
+                "name": ep.get("method_name", ""),
+                "class_name": ep.get("class_name", ""),
+                "file_path": ep.get("file_path", ""),
+                "file_name": ep.get("file_name", ""),
+                "base_path": ep.get("base_path", "/"),
+                "decorator_type": ep.get("decorator_type", ""),
+                "decorator_path": ep.get("decorator_path", ""),
+                "is_api_method": True,
+                "api_method_details": json.dumps({
+                    "method_type": ep.get("decorator_type", "GET"),
+                    "path": ep.get("decorator_path", ""),
+                    "base_path": ep.get("base_path", "/"),
+                }),
+            }
+            meta = {k: v for k, v in meta.items() if v is not None}
+
+            documents.append(Document(id=doc_id, content=ep.get("method_definition", ""), meta=meta))
+
+        logger.info(f"Created {len(documents)} endpoint documents")
+        return documents
+
+    # ------------------------------------------------------------------
+    # Code chunks → Documents  (from ASTCodeSplitter, already Documents)
+    # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # Legacy: FilesAnalyzer output → Documents (kept for backward compat)
+    # ------------------------------------------------------------------
+    def analyzed_files_to_documents(self, analyzed_files: List[Dict[str, Any]]) -> List[Document]:
+        """Convert FilesAnalyzer output to Haystack Documents (legacy path)."""
+        documents = []
         for file_entry in analyzed_files:
-            filename = file_entry.get('file_path', 'unknown')
-            items = file_entry.get('content', [])
-            
+            filename = file_entry.get("file_path", "unknown")
+            items = file_entry.get("content", [])
             for item in items:
                 documents.append(self._create_document_from_item(item, filename))
-        
         logger.info(f"Created {len(documents)} documents from analyzed files")
         return documents
 
     def _create_document_from_item(self, item: Dict[str, Any], default_file_path: str) -> Document:
-        lines = item.get('lines', [])
+        lines = item.get("lines", [])
         content_str = "".join(lines) if isinstance(lines, list) else str(lines)
 
-        is_api_method = item.get('is_api_method')
+        is_api_method = item.get("is_api_method")
         is_api_method_bool = bool(is_api_method)
         is_api_method_details = json.dumps(is_api_method) if isinstance(is_api_method, dict) else None
 
-        raw_deps = item.get('dependencies', [])
+        raw_deps = item.get("dependencies", [])
         dependencies_val = [json.dumps(d) if isinstance(d, dict) else str(d) for d in raw_deps]
 
-        file_name = os.path.basename(item.get('file_path', default_file_path))
-        origin_str = item.get('class_name', item.get('type', ''))
-        name_str = item.get('name', '')
+        file_name = os.path.basename(item.get("file_path", default_file_path))
+        origin_str = item.get("class_name", item.get("type", ""))
+        name_str = item.get("name", "")
         node_id = f"{file_name}:{origin_str}:{name_str}"
-
-        # Deterministic document ID based on node_id — ensures OVERWRITE replaces old docs
         doc_id = hashlib.sha256(node_id.encode()).hexdigest()
 
         meta = {
-            'type': item.get('type', ''),
-            'name': item.get('name', ''),
-            'file_path': item.get('file_path', default_file_path),
-            'node_id': node_id,
-            'class_name': item.get('class_name', ''),
-            'is_api_method': is_api_method_bool,
+            "type": item.get("type", ""),
+            "name": item.get("name", ""),
+            "file_path": item.get("file_path", default_file_path),
+            "node_id": node_id,
+            "class_name": item.get("class_name", ""),
+            "is_api_method": is_api_method_bool,
         }
-
         if is_api_method_details:
-            meta['api_method_details'] = is_api_method_details
-
+            meta["api_method_details"] = is_api_method_details
         if dependencies_val:
-            meta['dependencies'] = dependencies_val
-            meta['dependency_count'] = len(dependencies_val)
-
+            meta["dependencies"] = dependencies_val
+            meta["dependency_count"] = len(dependencies_val)
         if lines:
-            meta['lines'] = json.dumps(lines)
-
-        # Strip any None values to avoid polluting Weaviate schema with null fields
+            meta["lines"] = json.dumps(lines)
         meta = {k: v for k, v in meta.items() if v is not None}
 
-        doc = Document(
-            id=doc_id,
-            content=content_str,
-            meta=meta
-        )
-        return doc
-    
-    @component.output_types(
-        documents_written=int,
-    )
+        return Document(id=doc_id, content=content_str, meta=meta)
+
+    @component.output_types(documents_written=int)
     def run(
         self,
-        files: List[Dict[str, Any]]
+        endpoints: Optional[List[Dict[str, Any]]] = None,
+        code_chunks: Optional[List[Document]] = None,
+        files: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, int]:
         """
-        Process analyzer files output and write to Weaviate.
-        
+        Write endpoint definitions and/or code chunks to Weaviate.
+
         Args:
-            files: Dictionary of analyzed files from FilesAnalyzer.
-            
-        Returns:
-            Dictionary with count of documents written
+            endpoints: endpoint dicts from ControllerExtractor
+            code_chunks: Document list from ASTCodeSplitter
+            files: legacy FilesAnalyzer output (backward compatibility)
         """
-        logger.info(f"Starting WeaviateCodeWriter")
-        
-        if not files:
-            logger.warning("No files provided to write")
-            
-        # Process to documents
-        documents = self.analyzed_files_to_documents(files)
-        
-        if not documents:
+        logger.info("Starting WeaviateCodeWriter")
+        all_documents: List[Document] = []
+
+        # New AST-based path
+        if endpoints:
+            all_documents.extend(self.endpoints_to_documents(endpoints))
+        if code_chunks:
+            all_documents.extend(code_chunks)
+
+        # Legacy path
+        if files:
+            all_documents.extend(self.analyzed_files_to_documents(files))
+
+        if not all_documents:
             logger.warning("No documents created to write")
             return {"documents_written": 0}
-        
-        # Write to Weaviate (no embedder)
-        logger.info(f"Writing {len(documents)} documents to Weaviate without vectorization...")
-        self.writer.run(documents=documents)
-        
-        result = {
-            "documents_written": len(documents)
-        }
-        
-        logger.info(f"Successfully wrote {result['documents_written']} documents to Weaviate")
-        return result
+
+        logger.info(f"Writing {len(all_documents)} documents to Weaviate...")
+        self.writer.run(documents=all_documents)
+
+        logger.info(f"Successfully wrote {len(all_documents)} documents to Weaviate")
+        return {"documents_written": len(all_documents)}
