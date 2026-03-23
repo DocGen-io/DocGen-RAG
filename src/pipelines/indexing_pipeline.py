@@ -1,20 +1,23 @@
 """
-IndexingPipeline - Stage 3: Write code to Weaviate, generate docs, merge, vectorize, save hashes.
+IndexingPipeline - Stage 3: Write to Weaviate, build graphs, generate & merge docs, save hashes.
 
 Pipeline flow:
-    WeaviateCodeWriter + EndpointGraphManager -> DocumentationCreator
-        -> DocumentationMerger + WeaviateDocWriter -> FileHashSaver
+    WeaviateCodeWriter ──→ DocumentationCreator ──→ DocumentationMerger ──→ FileHashSaver
+           ↑                        ↑                       ↑
+    EndpointGraphManager ──────────┘
 
-Only reached after AnalysisPipeline succeeds.
-FileHashSaver commits hashes last, so a mid-run failure leaves no stale cache.
+WeaviateCodeWriter receives endpoints + code chunks from AnalysisPipeline.
+EndpointGraphManager builds dependency graphs from endpoint method bodies.
+DocumentationCreator uses the graphs + Weaviate to generate docs.
 """
 
-from typing import List, Dict, Any
-
+from typing import List, Dict, Any, Optional
+from haystack import Document
 from haystack.core.pipeline import AsyncPipeline
 
 from src.components.WeaviateCodeWriter import WeaviateCodeWriter
 from src.components.EndpointGraphManager import EndpointGraphManager
+from src.components.FilesAnalyzer import FilesAnalyzer
 from src.components.DocumentationCreator import DocumentationCreator
 from src.components.DocumentationMerger import DocumentationMerger
 from src.components.WeaviateDocWriter import WeaviateDocWriter
@@ -27,8 +30,8 @@ logger = DocGenLogger(__name__)
 
 class IndexingPipeline:
     """
-    Writes analyzed code to Weaviate, generates & merges endpoint documentation,
-    vectorizes docs, and finally commits file hashes on success.
+    Writes code data to Weaviate, builds endpoint dependency graphs,
+    generates & merges documentation, and commits file hashes on success.
     """
 
     def __init__(self, config_path: str = "config.yaml"):
@@ -40,6 +43,10 @@ class IndexingPipeline:
 
     def _build(self, weaviate_url: str, config_path: str):
         self.pipeline.add_component("weaviate_writer", WeaviateCodeWriter(weaviate_url=weaviate_url))
+        self.pipeline.add_component(
+            "files_analyzer",
+            FilesAnalyzer(weaviate_url=weaviate_url, config_path=config_path)
+        )
         self.pipeline.add_component("graph_manager", EndpointGraphManager())
         self.pipeline.add_component(
             "doc_creator",
@@ -52,45 +59,60 @@ class IndexingPipeline:
         )
         self.pipeline.add_component("file_hash_saver", FileHashSaver())
 
-        # Weaviate writer must finish BEFORE doc creator queries Weaviate
-        self.pipeline.connect("weaviate_writer.documents_written", "doc_creator.wait_for_weaviate")
-        # Graph -> doc creator
+        # Weaviate writer must finish BEFORE files_analyzer queries Weaviate
+        self.pipeline.connect("weaviate_writer.documents_written", "files_analyzer.wait_for_weaviate")
+        # files_analyzer → graph manager
+        self.pipeline.connect("files_analyzer.endpoints", "graph_manager.endpoints")
+        # Graph → doc creator
         self.pipeline.connect("graph_manager.endpoint_graphs", "doc_creator.endpoint_graphs")
-        # Doc creator -> merger
+        # Doc creator → merger
         self.pipeline.connect("doc_creator.output_dir", "doc_merger.output_dir")
-        # Doc creator -> weaviate doc writer
+        # Doc creator → weaviate doc writer
         self.pipeline.connect("doc_creator.output_files", "weaviate_doc_writer.output_files")
         self.pipeline.connect("doc_creator.output_dir", "weaviate_doc_writer.output_dir")
-        # Merger -> hash saver (commit only on success)
+        # Merger → hash saver (commit only on success)
         self.pipeline.connect("doc_merger.endpoints_merged", "file_hash_saver.merge_status")
 
     def run(
         self,
-        files: List[Dict[str, Any]],
+        endpoints: List[Dict[str, Any]],
+        code_chunks: List[Document],
         pending_hashes: Dict[str, str],
         project_name: str,
+        working_dir: str = "",
     ) -> Dict[str, Any]:
         """
-        Index analyzed files into documentation.
+        Index endpoints and code chunks into documentation.
 
         Args:
-            files: analyzed file list from AnalysisPipeline
-            pending_hashes: hash map from IngestionPipeline to commit if successful
+            endpoints: endpoint list from AnalysisPipeline (ControllerExtractor)
+            code_chunks: Document list from AnalysisPipeline (ASTCodeSplitter)
+            pending_hashes: hash map from IngestionPipeline
             project_name: used for namespacing output dirs
-
-        Returns:
-            Summary metrics dict
         """
-        if not files:
-            logger.info("IndexingPipeline: no files to index, skipping", location="run")
+        if not endpoints:
+            logger.info("IndexingPipeline: no endpoints to index, skipping", location="run")
             return {"documents_stored": 0, "endpoints_merged": 0, "hashes_saved": 0}
 
-        logger.info(f"IndexingPipeline: indexing {len(files)} analyzed file(s)", location="run")
+        logger.info(
+            f"IndexingPipeline: indexing {len(endpoints)} endpoint(s), {len(code_chunks)} chunk(s)",
+            location="run",
+        )
 
         result = self.pipeline.run(
             {
-                "weaviate_writer": {"files": files},
-                "graph_manager": {"project_name": project_name, "files": files},
+                "weaviate_writer": {
+                    "endpoints": endpoints,
+                    "code_chunks": code_chunks,
+                },
+                "files_analyzer": {
+                    "project_name": project_name,
+                    "endpoints": endpoints,
+                    "working_dir": working_dir,
+                },
+                "graph_manager": {
+                    "project_name": project_name,
+                },
                 "doc_creator": {"project_name": project_name},
                 "doc_merger": {"project_name": project_name},
                 "file_hash_saver": {
@@ -100,6 +122,7 @@ class IndexingPipeline:
             },
             include_outputs_from={
                 "weaviate_writer",
+                "files_analyzer",
                 "graph_manager",
                 "doc_creator",
                 "doc_merger",

@@ -68,4 +68,5 @@ class IngestionPipeline:
         return {
             "files": hasher_out.get("files", []),
             "pending_hashes": hasher_out.get("pending_hashes", {}),
+            "working_dir": hasher_out.get("working_dir", ""),
         }

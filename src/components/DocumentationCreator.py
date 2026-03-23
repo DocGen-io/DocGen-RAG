@@ -13,7 +13,7 @@ from src.utils.logger import DocGenLogger
 from typing import Dict, Any, List, Optional
 from src.utils.config_loader import load_config
 from src.utils.llm_json_handler import LLMJsonHandler
-from src.utils.weaviate_utils import fetch_by_node_id
+from src.utils.weaviate_utils import fetch_by_node_id, fetch_by_keyword
 from src.utils.dependency_graph import DependencyGraph
 from src.utils.modelGenerator import ModelGenerator
 from haystack.dataclasses import ChatMessage
@@ -51,8 +51,12 @@ class DocumentationCreator:
         
         context_parts = []
         for node_id in node_ids:
-            # Fetch from Weaviate using composite ID
-            docs = fetch_by_node_id(self.document_store, node_id)
+            if ":" in node_id:
+                # Fetch from Weaviate using exact composite ID
+                docs = fetch_by_node_id(self.document_store, node_id)
+            else:
+                # Search using BM25 keyword matching for bare AST string references
+                docs = fetch_by_keyword(self.document_store, node_id, top_k=1)
             
             if docs:
                 doc = docs[0]

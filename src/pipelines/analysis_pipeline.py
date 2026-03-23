@@ -1,52 +1,73 @@
 """
-AnalysisPipeline - Stage 2: AST / LLM file analysis (bottleneck).
+AnalysisPipeline - Stage 2: AST-based controller extraction + code chunking.
 
-Pipeline flow:
-    FilesAnalyzer (parallel threads internally)
+Pipeline flow (parallel branches):
+    files ──┬──→ ControllerExtractor ──→ endpoints
+            └──→ ASTCodeSplitter     ──→ code_chunks
 
-Receives a list of changed files from IngestionPipeline and produces
-structured analysis results per file used by IndexingPipeline.
+Replaces the previous LLM-based FilesAnalyzer bottleneck with fast,
+deterministic AST extraction.
 """
 
 from typing import List, Dict, Any
 
 from haystack.core.pipeline import AsyncPipeline
 
-from src.components.FilesAnalyzer import FilesAnalyzer
+from src.components.extractor.controller_extractor import ControllerExtractor
+from src.components.ast_code_splitter import ASTCodeSplitter
 from src.utils.logger import DocGenLogger
 
 logger = DocGenLogger(__name__)
 
 
 class AnalysisPipeline:
-    """Runs LLM-based file analysis on changed files."""
+    """Runs AST-based endpoint extraction and code chunking on changed files."""
 
     def __init__(self):
         self.pipeline = AsyncPipeline()
         self._build()
 
     def _build(self):
-        self.pipeline.add_component("files_analyzer", FilesAnalyzer())
+        self.pipeline.add_component("controller_extractor", ControllerExtractor())
+        self.pipeline.add_component("code_splitter", ASTCodeSplitter())
 
     def run(self, files: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
-        Analyze changed files.
+        Analyze changed files via AST extraction.
 
         Args:
             files: List of file dicts from IngestionPipeline.
 
         Returns:
-            files: List of analyzed file dicts with code chunks / endpoint info.
+            endpoints: flat list of endpoint dicts
+            code_chunks: list of Haystack Document objects
         """
         if not files:
             logger.info("AnalysisPipeline: no changed files, skipping", location="run")
-            return {"files": []}
+            return {"endpoints": [], "code_chunks": []}
 
         logger.info(f"AnalysisPipeline: analyzing {len(files)} file(s)", location="run")
 
         result = self.pipeline.run(
-            {"files_analyzer": {"files": files}},
-            include_outputs_from={"files_analyzer"},
+            {
+                "controller_extractor": {"files": files},
+                "code_splitter": {"files": files},
+            },
+            include_outputs_from={"controller_extractor", "code_splitter"},
         )
 
-        return {"files": result.get("files_analyzer", {}).get("files", [])}
+        extractor_out = result.get("controller_extractor", {})
+        splitter_out = result.get("code_splitter", {})
+
+        endpoints = extractor_out.get("endpoints", [])
+        code_chunks = splitter_out.get("documents", [])
+
+        logger.info(
+            f"AnalysisPipeline: found {len(endpoints)} endpoints, {len(code_chunks)} code chunks",
+            location="run",
+        )
+
+        return {
+            "endpoints": endpoints,
+            "code_chunks": code_chunks,
+        }

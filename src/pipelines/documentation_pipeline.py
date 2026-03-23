@@ -93,25 +93,34 @@ class DocumentationPipeline:
             )
             files = ingestion_out["files"]
             pending_hashes = ingestion_out["pending_hashes"]
+            working_dir = ingestion_out.get("working_dir", "")
 
             if not files:
                 logger.info("No changed files — pipeline complete (no-op)", location="run")
                 return {"status": "completed", "files": 0, "message": "No changed files."}
 
-            # Stage 2: Analyse
+            # Stage 2: AST-based analysis (parallel controller extraction + code chunking)
             analysis_out = self.analysis.run(files=files)
-            analyzed_files = analysis_out["files"]
+            endpoints = analysis_out["endpoints"]
+            code_chunks = analysis_out["code_chunks"]
 
-            # Stage 3: Index
+            if not endpoints:
+                logger.info("No REST endpoints found — pipeline complete (no-op)", location="run")
+                return {"status": "completed", "files": len(files), "message": "No REST endpoints found."}
+
+            # Stage 3: Index endpoints + chunks into documentation
             indexing_out = self.indexing.run(
-                files=analyzed_files,
+                endpoints=endpoints,
+                code_chunks=code_chunks,
                 pending_hashes=pending_hashes,
                 project_name=project_name,
+                working_dir=working_dir,
             )
 
             return {
                 "status": "completed",
                 "files": len(files),
+                "endpoints_found": len(endpoints),
                 **indexing_out,
             }
 

@@ -29,7 +29,7 @@ class TestPromptBuilding:
                 "parameters": [],
                 "responses": {}
             }
-            prompt = gen._build_prompt(swagger)
+            prompt = str(gen._build_prompt(swagger))
             assert "post" in prompt.lower()
             assert "/users" in prompt
 
@@ -47,7 +47,7 @@ class TestPromptBuilding:
                 ],
                 "responses": {}
             }
-            prompt = gen._build_prompt(swagger)
+            prompt = str(gen._build_prompt(swagger))
             assert "id" in prompt
             assert "fields" in prompt
 
@@ -75,7 +75,7 @@ class TestPromptBuilding:
                 },
                 "responses": {}
             }
-            prompt = gen._build_prompt(swagger)
+            prompt = str(gen._build_prompt(swagger))
             assert "name" in prompt
             assert "email" in prompt
 
@@ -126,6 +126,6 @@ class TestEmptyInput:
                 "summary": "Health check",
                 "responses": {"200": {"description": "OK"}}
             }
-            prompt = gen._build_prompt(swagger)
+            prompt = str(gen._build_prompt(swagger))
             assert "/health" in prompt
             assert "get" in prompt.lower()

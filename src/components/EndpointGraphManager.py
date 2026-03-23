@@ -273,6 +273,8 @@ class EndpointGraphManager:
     def _parse_dependency_id(self, dep: Any, current_file_path: str) -> str:
         """Parse a dependency object/string into the composite node ID."""
         if isinstance(dep, dict):
+            if "target_node_id" in dep and dep["target_node_id"]:
+                return dep["target_node_id"]
             file_path = dep.get('file_path', current_file_path)
             return self._create_node_id(file_path, dep.get('dependency_origin', ''), dep.get('dependency_name', ''), dep.get('method_type', 'unknown'))
         elif isinstance(dep, str):

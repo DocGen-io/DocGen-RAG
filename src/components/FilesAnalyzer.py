@@ -1,197 +1,175 @@
 import os
-import time
-import concurrent.futures
-from typing import List, Dict,Any
+import json
+from typing import List, Dict, Any, Optional, Set
 from haystack import component
+from haystack.dataclasses import ChatMessage
 from src.utils.logger import DocGenLogger
-from src.utils.modelGenerator import ModelGenerator
-from string import Template
-import threading
 from src.utils.config_loader import load_config
 from src.utils.llm_json_handler import LLMJsonHandler
-from prompts import get_file_analyzer_system_prompt, file_analyzer_user_prompt
-from src.components.LanguageFinder import LanguageFinder
-from opentelemetry import context
-import json
-logger = DocGenLogger()
+from src.utils.modelGenerator import ModelGenerator
+from src.utils.weaviate_utils import fetch_by_keyword, fetch_by_node_id
+from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
+from prompts.filesAnalyzerPrompt import get_file_analyzer_system_prompt, file_analyzer_user_prompt
+
+logger = DocGenLogger(__name__)
 
 @component
 class FilesAnalyzer:
-    def __init__(self, max_workers: int = 5):
-        self.max_workers = max_workers
-        self.model_generator = ModelGenerator("code_analyzer", temperature=0.0, seed=42).get_generator()  
-        self.config = load_config("config.yaml")
-        self.llm_json_handler = LLMJsonHandler()
-        self.language_finder = LanguageFinder()
-
-    @staticmethod
-    def number_file_lines(file_path: str) -> List[str]:
-        """Reads a file and returns a list of numbered lines."""
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                return [f"{i+1} | {line}" for i, line in enumerate(f)]
-        except Exception as e:
-            logger.error(f"Failed to process {file_path}: {e}")
-            return None
-
-
-    def parallel_numbering(self, input_files: List[Dict[str, str]])-> Dict[str, List[str]]:
-        
-        results = {}
-        start_time = time.time()
-        
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            # Submit using absolute path, but keep relative path for the result key
-            future_to_path = {
-                executor.submit(self.number_file_lines, f['path']): f['path']
-                for f in input_files
-            }
-            
-            for future in concurrent.futures.as_completed(future_to_path):
-                rel_path = future_to_path[future]
-                try:
-                    res = future.result()
-                    if res is not None:
-                        results[rel_path] = res
-                except Exception as e:
-                    logger.error(f"Thread error for {rel_path}: {e}")
+    """
+    Analyzes endpoints using an LLM to recursively discover dependencies.
+    For each discovered dependency, it queries Weaviate to fetch its code chunk,
+    and analyzes it again to find deep dependencies up to a maximum depth.
+    """
     
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        logger.info(f"Processed {len(results)} files using {self.max_workers} threads in {elapsed_time:.2f} seconds.")
+    def __init__(
+        self,
+        weaviate_url: str = "http://127.0.0.1:8080",
+        config_path: str = "config.yaml",
+        max_depth: int = 3
+    ):
+        self.config = load_config(config_path)
+        self.max_depth = max_depth
         
-        return results
+        # Use the 'code_analyzer' model config
+        self.generator = ModelGenerator("code_analyzer", config_path).get_generator()
+        self.document_store = WeaviateDocumentStore(url=weaviate_url)
 
-
-    def analyze_single_file(self, file_path: str, content: List[str]) -> Dict[str, Any]:
-        """Analyzes a single file and returns the structured JSON output."""
-        logger.info(f"Analyzing file: {file_path} with thread #{threading.get_ident()}")
-    
-        from haystack.dataclasses import ChatMessage
-        content_str = "".join(content)
-        user_prompt = file_analyzer_user_prompt.substitute(
+    def _analyze_code(self, file_path: str, code_content: str, language: str, method_name: str) -> List[Dict[str, Any]]:
+        """Run the LLM to extract dependencies from a code string."""
+        sys_prompt = get_file_analyzer_system_prompt(language)
+        usr_prompt = file_analyzer_user_prompt.substitute(
             query_data_file_path=file_path,
-            query_data_file_content=content_str
+            method_name=method_name,
+            query_data_file_content=code_content
         )
-        language = self.language_finder.detect(file_path)
-        system_prompt = get_file_analyzer_system_prompt(language)
+        
         messages = [
-            ChatMessage.from_system(system_prompt),
-            ChatMessage.from_user(user_prompt)
+            ChatMessage.from_system(sys_prompt),
+            ChatMessage.from_user(usr_prompt)
         ]
         
-        # 2. Get LLM response
-        response = self.model_generator.run(messages=messages)['replies'][0]
-        
-        # 3. Parse response
-        json_output = LLMJsonHandler.parse_with_retry(
-            response, 
-            generator=self.model_generator, 
-            prompt=messages,
-            max_retries=2
-        )
-        
-        return json_output
-
-    def analyze_files(self, input_files: Dict[str, List[str]])-> List[Dict[str,Any]]:
-        results = {}
-        start_time = time.time()
-
-        ctx = context.get_current()
-
-
-        def wrapped_analyze(file_path, content, ctx):
-            # Attach the parent context to this specific worker thread
-            token = context.attach(ctx)
-            try:
-                return file_path, self.analyze_single_file(file_path, content)
-            finally:
-                # detach to prevent memory leaks in the thread pool
-                context.detach(token)
-        
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures = []
-            for key, value in input_files.items():
-                futures.append(executor.submit(wrapped_analyze, key, value, ctx))
+        # The LLM outputs a dict with "content" array
+        result = LLMJsonHandler.parse_with_retry(generator=self.generator, prompt=messages, max_retries=2)
+        if not result or "content" not in result:
+            return []
             
-            for future in concurrent.futures.as_completed(futures):
-                try:
-                    fp, result = future.result()
-                    if result is not None:
-                        # Ensure the file_path key also is in the dictionary just in case
-                        result['file_path'] = fp
-                        results[fp] = result
-                        
-                        # Inject exact lines into every item in 'content'
-                        if 'content' in result and isinstance(result['content'], list):
-                            for item in result['content']:
-                                start_line = item.get('start_line')
-                                end_line = item.get('end_line')
-                                item['lines'] = self.get_exact_lines(fp, start_line, end_line)
+        return result.get("content", [])
 
-                        # if no content (data-model or interface)
-                        else:
-                            
-                            result['lines'] = self.get_exact_lines(fp, result.get('start_line'), result.get('end_line'))
-                            
-
-                        self._save_analyzer_output(fp, result)
-
-                except Exception as e:
-                    logger.error(f"Error analyzing file: {e}")
+    def _fetch_dependency_code(self, dependency_origin: str, dependency_name: str, current_path: str, current_code: str) -> tuple[Optional[str], str, str]:
+        """Fetch the code, file path, and Weaviate node_id of a dependency."""
+        search_query = f"{dependency_origin} {dependency_name}" if dependency_origin else dependency_name
         
-        end_time = time.time()
-        logger.info(f"Analyzed {len(results)} files in {end_time - start_time:.2f}s")
-        
-        return list(results.values())
-      
-    
-    def _save_analyzer_output(self, file_path: str, result: Dict[str, Any]) -> None:
-        """Saves the analyzer output to a JSON file."""
-        output_path = self.config.get("code_analyzer", {}).get("analyzer_output_path")
-        if output_path:
-            try:
-                # Keep the original filename structure and save it out as JSON
-                file_name = os.path.basename(file_path)
-                save_path = os.path.join(output_path, f"{file_name}.json")
-                os.makedirs(output_path, exist_ok=True)
+        # We fetch a configured top_k matches to ensure the true dependency is captured 
+        # even if BM25 scores the caller or other irrelevant files higher.
+        top_k = self.config.get("code_analyzer", {}).get("dependency_search_top_k", 100)
+        docs = fetch_by_keyword(self.document_store, search_query, top_k=top_k)
+        if not docs:
+            return None, "", ""
+            
+        # 1. First pass: look for a match in a completely DIFFERENT file that isn't the caller's code.
+        for doc in docs:
+            if doc.content.strip() == current_code.strip():
+                continue
                 
-                with open(save_path, 'w', encoding='utf-8') as f:
-                    json.dump(result, f, indent=4)
-                logger.info(f"Saved analyzer output to {save_path}")
-            except Exception as e:
-                logger.error(f"Failed to save analyzer output for {file_path}: {e}")
+            doc_path = doc.meta.get("file_path", "")
+            if doc_path.strip() != current_path.strip():
+                return doc.content, doc_path, doc.meta.get("node_id", "")
+                
+        # 2. Second pass (Fallback): If no matches in other files were found, the dependency might be 
+        # in the exact same file (e.g. a local helper function). Just return the first chunk that 
+        # isn't exactly the caller's chunk.
+        for doc in docs:
+            if doc.content.strip() != current_code.strip():
+                return doc.content, doc.meta.get("file_path", ""), doc.meta.get("node_id", "")
+                
+        # 3. Absolute fallback (everything was identical to caller for some reason)
+        return docs[0].content, docs[0].meta.get("file_path", ""), docs[0].meta.get("node_id", "")
 
+    @component.output_types(endpoints=List[Dict[str, Any]])
+    def run(
+        self,
+        endpoints: List[Dict[str, Any]],
+        project_name: str = "",
+        wait_for_weaviate: Optional[int] = None,
+        working_dir: str = ""
+    ) -> Dict[str, Any]:
+        """
+        Recursively analyzes endpoints and their dependencies.
+        Returns the updated endpoints list where each endpoint has a fully 
+        populated 'dependencies' list containing all deep dependencies.
+        """
+        if not endpoints:
+            return {"endpoints": []}
 
-
-    # get exact lines from files using start_line and end_line
-    def get_exact_lines(self, file_path: str, start_line: int, end_line: int) -> List[str]:
-        """Gets exact lines from a file using start_line and end_line."""
-        if start_line is None or end_line is None:
-            return None
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                return [line for i, line in enumerate(f) if start_line <= i+1 <= end_line]
-        except Exception as e:
-            logger.error(f"Failed to process {file_path}: {e}")
-            return None
+        logger.info(f"FilesAnalyzer: Recursively analyzing {len(endpoints)} endpoints")
         
-    @component.output_types(
-       files=List[Dict[str, Any]],
-    )
-    def run(self, files: List[Dict[str, str]]):
-        
+        for ep in endpoints:
+            method_name = ep.get("method_name", "ENDPOINT")
+            fallback_code = ep.get("method_definition", "")
+            if not fallback_code:
+                continue
+                
+            file_path = ep.get("file_path", "unknown")
+            ext = os.path.splitext(file_path)[1].lower()
+            language = "java" if ext == ".java" else "typescript" if ext == ".ts" else "c#" if ext == ".cs" else "python"
+            
+            # Try to load the full file. If it fails, fallback to the method code
+            try:
+                abs_path = os.path.join(working_dir, file_path) if working_dir and not os.path.isabs(file_path) else file_path
+                if os.path.exists(abs_path):
+                    with open(abs_path, "r", encoding="utf-8") as f:
+                        endpoint_code = f.read()
+                else:
+                    endpoint_code = fallback_code
+            except Exception:
+                endpoint_code = fallback_code
+            
+            visited: Set[str] = set()
+            all_discovered_deps: List[Dict[str, Any]] = []
+            
+            # queue tuples: (dependency_name, current_code, current_depth, current_file_path, current_method_name)
+            queue = [(method_name, endpoint_code, 0, file_path, method_name)]
+            
+            while queue:
+                current_name, current_code, current_depth, current_path, current_method_name = queue.pop(0)
+                
+                if current_name in visited:
+                    continue
+                visited.add(current_name)
+                
+                # Analyze the current code piece
+                analysis_results = self._analyze_code(current_path, current_code, language, current_method_name)
+                
+                for item in analysis_results:
+                    deps = item.get("dependencies", [])
+                    for d in deps:
+                        dep_name = d.get("dependency_name")
+                        if not dep_name or dep_name in visited:
+                            continue
+                            
+                        dep_origin = d.get("dependency_origin", "")
+                        dep_chunk_code, dep_file_path, dep_node_id = self._fetch_dependency_code(dep_origin, dep_name, current_path, current_code)
+                        if dep_node_id:
+                            d["target_node_id"] = dep_node_id
+                            
+                        # Add to the endpoint's discovered dependencies
+                        all_discovered_deps.append(d)
+                        
+                        # Fetch its code and add to queue if we haven't reached max depth
+                        if current_depth < self.max_depth and dep_chunk_code:
+                            # Try to load full file for the dependency
+                            dep_full_code = dep_chunk_code
+                            try:
+                                dep_file_path = dep_file_path or ""
+                                dep_abs_path = os.path.join(working_dir, dep_file_path) if working_dir and not os.path.isabs(dep_file_path) else dep_file_path
+                                if dep_abs_path and os.path.exists(dep_abs_path):
+                                    with open(dep_abs_path, "r", encoding="utf-8") as f:
+                                        dep_full_code = f.read()
+                            except Exception:
+                                pass
+                            queue.append((dep_name, dep_full_code, current_depth + 1, dep_file_path or current_path, dep_name))
+                                
+            # Attach all fully resolved dependencies back to the endpoint
+            ep["dependencies"] = all_discovered_deps
 
-        # first number lines of file
-        results =  self.parallel_numbering(files)
-
-        # then analyze the files
-        results = self.analyze_files(results)
-
-        return {"files":results}
-
-        # then provide the whole file with line numbers as input to llm
-        # llm will provide the line ranges for each function
-        
-
-    
+        return {"endpoints": endpoints}
