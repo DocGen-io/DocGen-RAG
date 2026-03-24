@@ -32,7 +32,7 @@ class FilesAnalyzer:
         
         # Use the 'code_analyzer' model config
         self.generator = ModelGenerator("code_analyzer", config_path).get_generator()
-        self.document_store = WeaviateDocumentStore(url=weaviate_url)
+        self.weaviate_url = weaviate_url
 
     def _analyze_code(self, file_path: str, code_content: str, language: str, method_name: str) -> List[Dict[str, Any]]:
         """Run the LLM to extract dependencies from a code string."""
@@ -103,73 +103,76 @@ class FilesAnalyzer:
 
         logger.info(f"FilesAnalyzer: Recursively analyzing {len(endpoints)} endpoints")
         
-        for ep in endpoints:
-            method_name = ep.get("method_name", "ENDPOINT")
-            fallback_code = ep.get("method_definition", "")
-            if not fallback_code:
-                continue
-                
-            file_path = ep.get("file_path", "unknown")
-            ext = os.path.splitext(file_path)[1].lower()
-            language = "java" if ext == ".java" else "typescript" if ext == ".ts" else "c#" if ext == ".cs" else "python"
-            
-            # Try to load the full file. If it fails, fallback to the method code
-            try:
-                abs_path = os.path.join(working_dir, file_path) if working_dir and not os.path.isabs(file_path) else file_path
-                if os.path.exists(abs_path):
-                    with open(abs_path, "r", encoding="utf-8") as f:
-                        endpoint_code = f.read()
-                else:
-                    endpoint_code = fallback_code
-            except Exception:
-                endpoint_code = fallback_code
-            
-            visited: Set[str] = set()
-            all_discovered_deps: List[Dict[str, Any]] = []
-            
-            # queue tuples: (dependency_name, current_code, current_depth, current_file_path, current_method_name)
-            queue = [(method_name, endpoint_code, 0, file_path, method_name)]
-            
-            while queue:
-                current_name, current_code, current_depth, current_path, current_method_name = queue.pop(0)
-                
-                if current_name in visited:
+        from src.utils.weaviate_utils import get_weaviate_store
+        
+        with get_weaviate_store(url=self.weaviate_url) as self.document_store:
+            for ep in endpoints:
+                method_name = ep.get("method_name", "ENDPOINT")
+                fallback_code = ep.get("method_definition", "")
+                if not fallback_code:
                     continue
-                visited.add(current_name)
+                    
+                file_path = ep.get("file_path", "unknown")
+                ext = os.path.splitext(file_path)[1].lower()
+                language = "java" if ext == ".java" else "typescript" if ext == ".ts" else "c#" if ext == ".cs" else "python"
                 
-                # Analyze the current code piece
-                analysis_results = self._analyze_code(current_path, current_code, language, current_method_name)
+                # Try to load the full file. If it fails, fallback to the method code
+                try:
+                    abs_path = os.path.join(working_dir, file_path) if working_dir and not os.path.isabs(file_path) else file_path
+                    if os.path.exists(abs_path):
+                        with open(abs_path, "r", encoding="utf-8") as f:
+                            endpoint_code = f.read()
+                    else:
+                        endpoint_code = fallback_code
+                except Exception:
+                    endpoint_code = fallback_code
                 
-                for item in analysis_results:
-                    deps = item.get("dependencies", [])
-                    for d in deps:
-                        dep_name = d.get("dependency_name")
-                        if not dep_name or dep_name in visited:
-                            continue
-                            
-                        dep_origin = d.get("dependency_origin", "")
-                        dep_chunk_code, dep_file_path, dep_node_id = self._fetch_dependency_code(dep_origin, dep_name, current_path, current_code)
-                        if dep_node_id:
-                            d["target_node_id"] = dep_node_id
-                            
-                        # Add to the endpoint's discovered dependencies
-                        all_discovered_deps.append(d)
-                        
-                        # Fetch its code and add to queue if we haven't reached max depth
-                        if current_depth < self.max_depth and dep_chunk_code:
-                            # Try to load full file for the dependency
-                            dep_full_code = dep_chunk_code
-                            try:
-                                dep_file_path = dep_file_path or ""
-                                dep_abs_path = os.path.join(working_dir, dep_file_path) if working_dir and not os.path.isabs(dep_file_path) else dep_file_path
-                                if dep_abs_path and os.path.exists(dep_abs_path):
-                                    with open(dep_abs_path, "r", encoding="utf-8") as f:
-                                        dep_full_code = f.read()
-                            except Exception:
-                                pass
-                            queue.append((dep_name, dep_full_code, current_depth + 1, dep_file_path or current_path, dep_name))
+                visited: Set[str] = set()
+                all_discovered_deps: List[Dict[str, Any]] = []
+                
+                # queue tuples: (dependency_name, current_code, current_depth, current_file_path, current_method_name)
+                queue = [(method_name, endpoint_code, 0, file_path, method_name)]
+                
+                while queue:
+                    current_name, current_code, current_depth, current_path, current_method_name = queue.pop(0)
+                    
+                    if current_name in visited:
+                        continue
+                    visited.add(current_name)
+                    
+                    # Analyze the current code piece
+                    analysis_results = self._analyze_code(current_path, current_code, language, current_method_name)
+                    
+                    for item in analysis_results:
+                        deps = item.get("dependencies", [])
+                        for d in deps:
+                            dep_name = d.get("dependency_name")
+                            if not dep_name or dep_name in visited:
+                                continue
                                 
-            # Attach all fully resolved dependencies back to the endpoint
-            ep["dependencies"] = all_discovered_deps
+                            dep_origin = d.get("dependency_origin", "")
+                            dep_chunk_code, dep_file_path, dep_node_id = self._fetch_dependency_code(dep_origin, dep_name, current_path, current_code)
+                            if dep_node_id:
+                                d["target_node_id"] = dep_node_id
+                                
+                            # Add to the endpoint's discovered dependencies
+                            all_discovered_deps.append(d)
+                            
+                            # Fetch its code and add to queue if we haven't reached max depth
+                            if current_depth < self.max_depth and dep_chunk_code:
+                                # Try to load full file for the dependency
+                                dep_full_code = dep_chunk_code
+                                try:
+                                    dep_file_path = dep_file_path or ""
+                                    dep_abs_path = os.path.join(working_dir, dep_file_path) if working_dir and not os.path.isabs(dep_file_path) else dep_file_path
+                                    if dep_abs_path and os.path.exists(dep_abs_path):
+                                        with open(dep_abs_path, "r", encoding="utf-8") as f:
+                                            dep_full_code = f.read()
+                                except Exception:
+                                    pass
+                                queue.append((dep_name, dep_full_code, current_depth + 1, dep_file_path or current_path, dep_name))
+                                    
+                # Attach all fully resolved dependencies back to the endpoint
+                ep["dependencies"] = all_discovered_deps
 
         return {"endpoints": endpoints}

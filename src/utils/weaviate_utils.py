@@ -122,3 +122,24 @@ def fetch_by_keyword(
     except Exception as e:
         logger.error(f"Error fetching documents for keyword {keyword}: {e}")
         return []
+
+from contextlib import contextmanager
+
+@contextmanager
+def get_weaviate_store(url: str = "http://127.0.0.1:8080", **kwargs):
+    """
+    Context manager to initialize and automatically close WeaviateDocumentStore.
+    Produces DRY, reliable connection handling.
+    """
+    store = WeaviateDocumentStore(url=url, **kwargs)
+    try:
+        yield store
+    finally:
+        try:
+            # Explicitly close the connection to stop the ResourceWarnings
+            if hasattr(store, "_client") and hasattr(store._client, "close"):
+                store._client.close()
+            elif hasattr(store, "close"):
+                store.close()
+        except Exception as e:
+            logger.error(f"Failed to close WeaviateDocumentStore: {e}")

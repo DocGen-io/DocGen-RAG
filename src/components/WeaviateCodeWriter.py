@@ -36,15 +36,6 @@ class WeaviateCodeWriter:
         self.additional_headers = additional_headers or {}
         self.config = load_config("config.yaml")
 
-        self.document_store = WeaviateDocumentStore(
-            url=weaviate_url,
-            additional_headers=self.additional_headers,
-        )
-        self.writer = DocumentWriter(
-            document_store=self.document_store,
-            policy=DuplicatePolicy.OVERWRITE,
-        )
-
     # ------------------------------------------------------------------
     # Endpoint definitions → Documents
     # ------------------------------------------------------------------
@@ -112,12 +103,20 @@ class WeaviateCodeWriter:
         if code_chunks:
             all_documents.extend(code_chunks)
 
+        from src.utils.weaviate_utils import get_weaviate_store
+
         if not all_documents:
             logger.warning("No documents created to write")
             return {"documents_written": 0}
 
         logger.info(f"Writing {len(all_documents)} documents to Weaviate...")
-        self.writer.run(documents=all_documents)
+        
+        with get_weaviate_store(url=self.weaviate_url, additional_headers=self.additional_headers) as doc_store:
+            writer = DocumentWriter(
+                document_store=doc_store,
+                policy=DuplicatePolicy.OVERWRITE,
+            )
+            writer.run(documents=all_documents)
 
         logger.info(f"Successfully wrote {len(all_documents)} documents to Weaviate")
         return {"documents_written": len(all_documents)}

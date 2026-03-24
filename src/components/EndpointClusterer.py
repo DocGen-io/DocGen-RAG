@@ -34,7 +34,7 @@ class EndpointClusterer:
     ):
         config = load_config(config_path)
         self.n_clusters = config.get("endpoint_clusterer", {}).get("n_clusters", "auto")
-        self.doc_store = WeaviateDocumentStore(url=weaviate_url)
+        self.weaviate_url = weaviate_url
 
     @staticmethod
     def _estimate_clusters(n_endpoints: int) -> int:
@@ -75,9 +75,12 @@ class EndpointClusterer:
             Dictionary with 'clusters' mapping cluster_id -> endpoint list.
         """
         # Fetch all endpoint documentation docs
-        docs = self.doc_store.filter_documents(
-            filters={"field": "meta.doc_type", "operator": "==", "value": "endpoint_documentation"}
-        )
+        from src.utils.weaviate_utils import get_weaviate_store
+        
+        with get_weaviate_store(url=self.weaviate_url) as doc_store:
+            docs = doc_store.filter_documents(
+                filters={"field": "meta.doc_type", "operator": "==", "value": "endpoint_documentation"}
+            )
 
         if not docs:
             logger.warning("No endpoint docs found in Weaviate")
