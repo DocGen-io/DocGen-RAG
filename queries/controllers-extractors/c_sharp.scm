@@ -6,8 +6,8 @@
   ;; A. Gatekeeper: Must have the [ApiController] attribute
   (attribute_list
     (attribute
-      name: (identifier) @class_decorator_name
-      (#match? @class_decorator_name "^(ApiController|Controller)$")
+      name: (identifier) @class_decorator_type
+      (#match? @class_decorator_type "^(ApiController|Controller)$")
     )
   ) @class_decorator
   
