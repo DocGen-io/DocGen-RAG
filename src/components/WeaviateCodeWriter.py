@@ -6,16 +6,19 @@ Handles two types of data:
 2. Structural code chunks (from ASTCodeSplitter)
 """
 
+import os
+import json
+import hashlib
 from haystack import component, Document
+from src.utils.logger import DocGenLogger
+from src.utils.types import ASTOutputRecord
+from typing import List, Dict, Any, Optional
+from src.utils.config_loader import load_config
 from haystack.components.writers import DocumentWriter
 from haystack.document_stores.types import DuplicatePolicy
+from src.utils.weaviate_utils import get_weaviate_store,get_node_id
 from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
-from typing import List, Dict, Any, Optional
-from src.utils.logger import DocGenLogger
-from src.utils.config_loader import load_config
-import hashlib
-import json
-import os
+
 
 logger = DocGenLogger(__name__)
 
@@ -36,25 +39,36 @@ class WeaviateCodeWriter:
         self.additional_headers = additional_headers or {}
         self.config = load_config("config.yaml")
 
-    # ------------------------------------------------------------------
-    # Endpoint definitions → Documents
-    # ------------------------------------------------------------------
-    def endpoints_to_documents(self, endpoints: List[Dict[str, Any]]) -> List[Document]:
+ 
+    def ast_endpoints_to_documents(self, ast_output: List[ASTOutputRecord],file_type:str='endpoint') -> List[Document]:
         """
-        Convert ControllerExtractor endpoint dicts to Haystack Documents.
-
-        Each endpoint becomes a single Document with:
-          - content = method_definition
-          - meta.type = "endpoint_definition"
-          - meta.node_id = file_name:class_name:method_name
+        Convert AST output dicts to Haystack Documents.
         """
+        
         documents = []
-        for ep in endpoints:
-            node_id = ep.get("node_id") or f"{ep.get('file_name', 'unknown')}:{ep.get('class_name', 'Global')}:{ep.get('method_name', 'unknown')}:{ep.get('method_type', 'unknown')}"
+        for ep in ast_output:
+            node_id = get_node_id(ep.get('file_name'),ep.get('class_name'),ep.get('method_name'),ep.get('method_type'))
             doc_id = hashlib.sha256(node_id.encode()).hexdigest()
 
+            if file_type =='endpoint':
+                add_on_meta = {
+                    "is_api_method":True,
+                     "api_method_details": json.dumps({
+                    "method_type": ep.get("decorator_type", "GET"),
+                    "path": ep.get("decorator_path", ""),
+                    "base_path": ep.get("base_path", "/"),
+                }),
+
+                }
+            else:  # non-controller file
+                add_on_meta = {
+                    "is_api_method":False,
+                    "api_method_details": None,
+                }
+            
+
             meta = {
-                "type": "endpoint_definition",
+                "type":file_type,
                 "node_id": node_id,
                 "name": ep.get("method_name", ""),
                 "class_name": ep.get("class_name", ""),
@@ -63,12 +77,7 @@ class WeaviateCodeWriter:
                 "base_path": ep.get("base_path", "/"),
                 "decorator_type": ep.get("decorator_type", ""),
                 "decorator_path": ep.get("decorator_path", ""),
-                "is_api_method": True,
-                "api_method_details": json.dumps({
-                    "method_type": ep.get("decorator_type", "GET"),
-                    "path": ep.get("decorator_path", ""),
-                    "base_path": ep.get("base_path", "/"),
-                }),
+                **add_on_meta
             }
             meta = {k: v for k, v in meta.items() if v is not None}
 
@@ -84,8 +93,8 @@ class WeaviateCodeWriter:
     @component.output_types(documents_written=int)
     def run(
         self,
-        endpoints: Optional[List[Dict[str, Any]]] = None,
-        code_chunks: Optional[List[Document]] = None,
+        endpoints: Optional[List[ASTOutputRecord]] = None,
+        code_chunks: Optional[List[ASTOutputRecord]] = None,
     ) -> Dict[str, int]:
         """
         Write endpoint definitions and/or code chunks to Weaviate.
@@ -98,12 +107,9 @@ class WeaviateCodeWriter:
         all_documents: List[Document] = []
 
         # New AST-based path
-        if endpoints:
-            all_documents.extend(self.endpoints_to_documents(endpoints))
-        if code_chunks:
-            all_documents.extend(code_chunks)
+        all_documents.extend(self.ast_endpoints_to_documents(endpoints))
+        all_documents.extend(self.ast_endpoints_to_documents(code_chunks,file_type='code_chunk'))
 
-        from src.utils.weaviate_utils import get_weaviate_store
 
         if not all_documents:
             logger.warning("No documents created to write")
