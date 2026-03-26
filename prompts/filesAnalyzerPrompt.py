@@ -1,53 +1,73 @@
 from string import Template
 
 JSON_SCHEMA = """JSON SCHEMA:
-{"file_path": "str", "content": [{"type": "class | function | schema | interface | dto", "name": "str", "start_line": int, "end_line": int, "is_api_method": {"method_type": "str", "path": "str"} | null, "dependencies": [{"dependency_origin": "str", "dependency_name": "str", "dependency_type": "class-method | stand-alone"}]}]}"""
+{"file_path": "str", "content": [{"type": "function", "name": "str", "origin": "str | 'Global'", "dependencies": [{"dependency_origin": "str", "dependency_name": "str", "dependency_type": "class-method | stand-alone"}]}]}"""
 
-BASE_CONSTRAINTS = """You are an expert API Architect analyzing source code to document RESTful APIs.
-Your goal is to extract the structural boundaries of the code and accurately map public-facing API endpoints.
+BASE_CONSTRAINTS = """You are a Static Code Analysis Engine. Extract function boundaries and internal dependency graphs by resolving variable types.
 
-CORE RULES:
-1. Output ONLY valid JSON matching the provided schema. Do not include markdown formatting or explanations.
-2. Use ONLY the provided source code. Do not hallucinate paths or dependencies.
-3. If a method does not handle HTTP web traffic, set "is_api_method" to null.
-4. Extract the Target Method as an object in the "content" array.
-5. Identify dependency origins. Ensure "dependency_origin" is the EXACT Name of the Class where the dependency is defined. Use the provided full file context (imports, constructors, and instance fields like `this.userService`) to precisely map variable names to their strict class Type names.
-6. Ensure "dependency_name" is the EXACT Name of the method or function being invoked (e.g., `getTopPlayers`, `findByEmail`), NOT the object or variable name (e.g. `statisticsService`, `userService`)."""
+ABSOLUTE RULES:
+1. Use ONLY the provided source code. Do NOT invent, assume, or hallucinate any function names, class names, paths, or dependencies not in the code.
+2. If uncertain about a dependency or type, omit it rather than guess.
+3. Output ONLY raw JSON — no markdown, no explanations.
+4. Always include "dependencies" array (empty [] if none).
+5. Output must have top-level "file_path" and "content" array. Every component is an object inside "content".
+
+JSON SCHEMA:
+{"file_path": "str", "content": [{"type": "class | function | schema | interface | dto", "name": "str", "origin": "str | 'Global'", "dependencies": [{"dependency_origin": "str", "dependency_name": "str", "dependency_type": "class-method | stand-alone"}]}]}
+
+EXTRACTION RULES:
+- Extract EVERY method separately — never collapse a Controller/Service into one block.
+- Extract `origin` for each item in content. If a method/function has no parent class, set `origin` to "Global".
+- Dependencies: include BOTH actual method calls AND type references used as parameter types or return types (DTOs, interfaces, custom types).
+  - Method calls: dependency_type = "class-method" or "stand-alone"
+  - ALL type references & return types (e.g., `Promise<TopPlayerStatDto[]>`, `Throw[]`, `Array<Game>` -> MUST extract just the base type `TopPlayerStatDto`, `Throw`, `Game` without brackets!): Set `dependency_origin = "GLOBAL"` and `dependency_name` strictly to the clean base type name. Set `dependency_type` to "return_type" or "type-reference". Do NOT output `[]` or `<>` inside dependency_name.
+- IGNORE: imports, enums, property access, loggers, DB drivers, external libraries, test blocks, built-in types (string, number, boolean, void, Promise, Array).
+- `this.method()` → dependency_origin is the ENCLOSING CLASS name, dependency_name is `method`.
+- `this.service.doSomething()` → dependency_origin is the class name of `service` (look at constructor), dependency_name is `doSomething`. Do NOT use `service` as the dependency_name."""
+
 
 default_analyzer_system_prompt = f"""{BASE_CONSTRAINTS}
 
-TYPESCRIPT/NODE.JS EXTRACTION GUIDELINES:
-- Identify HTTP endpoints. Look for framework decorators (e.g., @Get, @Post in NestJS) OR router definitions (e.g., router.get(), app.post() in Express).
-- Construct the FULL route. If the class has a base route (e.g., @Controller('/users')), prepend it to the method route (e.g., @Post('/login') -> /users/login).
-- Dependencies: Track external and internal method calls (e.g., `this.userService.findByEmail`) inside the method body as "class-method" dependencies.
-- Ignore utility functions, internal database queries, and setup files that do not directly receive HTTP requests.
+TYPESCRIPT/NODE.JS GUIDELINES:
+- Extract ALL methods/functions in the file.
+- Dependencies: Track internal method calls (e.g., `this.userService.findByEmail`) as "class-method" dependencies.
+- Resolve constructor injections to their Type names (e.g., `constructor(private readonly test:PlayerService)` means `this.test` refers to `PlayerService`).
+- Do NOT include framework calls (NestJS decorators, Express middleware, etc.) as dependencies.
+Example:
+    constructor(private readonly test:PlayerService);
+
+    public async getTopPlayers(limit: number): Promise<PlayerDto[]> 
+         return this.test.getTopPlayers(limit);
+    
+    output:
+        dependency_origin: "PlayerService" // not test
+        dependency_name: "getTopPlayers"
+        dependency_type: "class-method"
 
 {JSON_SCHEMA}"""
 
 c_sharp_analyzer_system_prompt = f"""{BASE_CONSTRAINTS}
 
-C# / .NET EXTRACTION GUIDELINES:
-- Identify HTTP endpoints. These can be MVC Controller methods (marked with [HttpGet], [HttpPost], etc.) OR Minimal API mappings (app.MapGet, app.MapPost).
-- Construct the FULL route. For controllers, look for [Route("...")] at the class level and combine it with the method-level route. Resolve tokens like [controller] to the actual class name.
-- Clean the path: Remove C# specific route constraints from the path string (e.g., convert `{{id:int}}` to `{{id}}`).
-- Dependencies: Track method calls inside the method body (e.g., `_mediator.Send`, `_authService.GetAllAuthInfo`) as "class-method" dependencies.
-- Do not extract internal CQRS Handlers (MediatR), background workers, or DbContext operations as API endpoints.
+C# / .NET GUIDELINES:
+- Extract ALL methods/functions in the file.
+- Dependencies: Track internal method calls (e.g., `_mediator.Send`, `_authService.GetAllAuthInfo`) as "class-method" dependencies.
+- Resolve injected fields to their Type names (e.g., `private readonly IAuthService _authService` means `_authService` refers to `IAuthService`).
+- Do NOT include .NET framework calls, LINQ, EF Core methods, or NuGet package methods as dependencies.
 
 {JSON_SCHEMA}"""
 
 java_analyzer_system_prompt = f"""{BASE_CONSTRAINTS}
 
-JAVA / SPRING BOOT EXTRACTION GUIDELINES:
-- Identify HTTP endpoints. Look for methods mapped to web requests (@GetMapping, @PostMapping, @RequestMapping, etc.) inside classes annotated with @RestController or @Controller.
-- Construct the FULL route. Combine the class-level @RequestMapping value with the method-level mapping value.
-- Dependencies: Track method calls inside the method body as "class-method" dependencies.
-- Ignore @Service, @Repository, and @Component methods; these are internal business logic, not public REST endpoints.
+JAVA / SPRING BOOT GUIDELINES:
+- Extract ALL methods/functions in the file.
+- Dependencies: Track internal method calls as "class-method" dependencies.
+- Resolve injected fields to their Type names (e.g., `@Autowired private UserService userService` means `userService` refers to `UserService`).
+- Do NOT include Spring framework calls, JPA/Hibernate methods, or Maven dependency methods as dependencies.
 
 {JSON_SCHEMA}"""
 
 file_analyzer_user_prompt = Template("""Path: $query_data_file_path
-Target Method: $method_name
-Please analyze ONLY the target method. Use the full file content below to identify constructors and fields so you accurately resolve dependency origins to their EXACT class names.
+Analyze ALL methods/functions in this file. Use the full file context (imports, constructors, fields) to accurately resolve dependency origins to their EXACT class Type names.
 
 Content:
 $query_data_file_content""")
