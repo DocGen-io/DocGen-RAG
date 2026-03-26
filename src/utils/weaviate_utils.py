@@ -9,7 +9,6 @@ from typing import List, Optional
 from haystack.dataclasses import Document
 from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
 from .logger import DocGenLogger
-from haystack_integrations.components.retrievers.weaviate import WeaviateBM25Retriever
 
 logger = DocGenLogger(__name__)
 
@@ -46,6 +45,9 @@ def fetch_by_method_name(
         logger.error(f"Error fetching documents for method {method_name}: {e}")
         return []
 
+
+def get_node_id(file_name: str,class_name: str, method_name: str="none",method_type:str = "unknown") -> str:
+    return f"{file_name.lower()}:{class_name.lower()}:{method_name.lower()}:{method_type.lower()}"
 
 def fetch_by_class_name(
     document_store: WeaviateDocumentStore,
@@ -105,22 +107,6 @@ def fetch_by_node_id(
         return documents
     except Exception as e:
         logger.error(f"Error fetching documents for node_id {node_id}: {e}")
-        return []
-
-def fetch_by_keyword(
-    document_store: WeaviateDocumentStore,
-    keyword: str,
-    top_k: int = 3
-) -> List[Document]:
-    """Search Weaviate using BM25 keyword matching."""
-    try:
-        retriever = WeaviateBM25Retriever(document_store=document_store, top_k=top_k)
-        result = retriever.run(query=keyword)
-        documents = result.get("documents", [])
-        logger.debug(f"Found {len(documents)} documents for keyword: {keyword}")
-        return documents
-    except Exception as e:
-        logger.error(f"Error fetching documents for keyword {keyword}: {e}")
         return []
 
 from contextlib import contextmanager
