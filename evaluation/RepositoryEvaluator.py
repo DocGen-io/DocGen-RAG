@@ -6,7 +6,7 @@ from typing import Optional, Dict
 from src.pipelines.documentation_pipeline import DocumentationPipeline
 from evaluation.metrics import evaluate_structural_validity, evaluate_accuracy
 from src.utils.logger import DocGenLogger
-from evaluation.EvaluationData import EvaluationRecord
+from src.utils.types.evaluation_output_type import EvaluationRecord
 
 logger = DocGenLogger(__name__)
 
