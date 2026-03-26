@@ -13,13 +13,14 @@ from src.utils.logger import DocGenLogger
 from typing import Dict, Any, List, Optional
 from src.utils.config_loader import load_config
 from src.utils.llm_json_handler import LLMJsonHandler
-from src.utils.weaviate_utils import fetch_by_node_id, fetch_by_keyword
+from src.utils.weaviate_utils import fetch_by_node_id
 from src.utils.dependency_graph import DependencyGraph
 from src.utils.modelGenerator import ModelGenerator
 from haystack.dataclasses import ChatMessage
 from prompts import doc_creator_system_prompt, doc_creator_user_prompt
 from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
 from src.utils.definitions import API_METHODS
+
 logger = DocGenLogger(__name__)
 
 
@@ -40,7 +41,9 @@ class DocumentationCreator:
         self.generator = ModelGenerator("doc_creator", config_path).get_generator()
         self.config = load_config(config_path)
         self.output_dir = self.config.get("doc_creator", {}).get("output_dir", "output")
-        self.weaviate_url = weaviate_url
+        
+        # Initialize Weaviate document store
+        self.document_store = WeaviateDocumentStore(url=weaviate_url)
     
     def _fetch_dependency_context(self, node_ids: List[str]) -> str:
         """Fetch code context from Weaviate for a list of node IDs."""
@@ -49,12 +52,7 @@ class DocumentationCreator:
         
         context_parts = []
         for node_id in node_ids:
-            if ":" in node_id:
-                # Fetch from Weaviate using exact composite ID
-                docs = fetch_by_node_id(self.document_store, node_id)
-            else:
-                # Search using BM25 keyword matching for bare AST string references
-                docs = fetch_by_keyword(self.document_store, node_id, top_k=1)
+            docs = fetch_by_node_id(self.document_store, node_id)
             
             if docs:
                 doc = docs[0]
@@ -158,78 +156,79 @@ class DocumentationCreator:
         methods_failed = 0
         output_files = {}
 
-        from src.utils.weaviate_utils import get_weaviate_store
+        for endpoint_id, graph in endpoint_graphs.items():
+            logger.info(f"Processing endpoint graph: {endpoint_id}")
 
-        with get_weaviate_store(url=self.weaviate_url) as self.document_store:
-            for endpoint_id, graph in endpoint_graphs.items():
-                logger.info(f"Processing endpoint graph: {endpoint_id}")
+            try:
+                # 1. Gather all internal dependencies (excluding the endpoint itself to save tokens)
+                node_ids = [n for n in graph.get_all_nodes() if n != endpoint_id]
 
-                try:
-                    # 1. Gather all nodes involved in this endpoint (including the endpoint itself)
-                    node_ids = list(graph.get_all_nodes())
 
-                    # 2. Fetch context from Weaviate for all nodes
-                    dep_context = self._fetch_dependency_context(node_ids)
-                    
-                    # 3. Extract the endpoint method's details from Weaviate to guide the prompt
-                    endpoint_doc_list = fetch_by_node_id(self.document_store, endpoint_id)
-                    logger.info(f"Found {len(endpoint_doc_list)} doc(s) in Weaviate for {endpoint_id}")
+                for noed_id in node_ids:
+                    logger.info(f"Found dependency: {noed_id}")
 
-                    if not endpoint_doc_list:
-                        logger.error(f"Endpoint {endpoint_id} not found in Weaviate. Skipping.")
-                        methods_failed += 1
-                        continue
+                # 2. Fetch context from Weaviate for all nodes
+                dep_context = self._fetch_dependency_context(node_ids)
+                
+                # 3. Extract the endpoint method's details from Weaviate to guide the prompt
+                endpoint_doc_list = fetch_by_node_id(self.document_store, endpoint_id)
+                logger.info(f"Found {len(endpoint_doc_list)} doc(s) in Weaviate for {endpoint_id}")
 
-                    endpoint_doc = endpoint_doc_list[0]
-                    meta = endpoint_doc.meta
-
-                    api_details_str = meta.get("api_method_details", "{}")
-                    try:
-                        api_details = json.loads(api_details_str) if isinstance(api_details_str, str) else api_details_str
-                    except Exception:
-                        api_details = {}
-                    if not isinstance(api_details, dict):
-                        api_details = {}
-
-                    raw_method_type = str(api_details.get("method_type", "unknown"))
-                   
-                    logger.info(f"Processing endpoint {endpoint_id} of type: {raw_method_type}")
-                    # Check if this is an internal/RPC method like `grpc_method`
-                    if raw_method_type.lower()  not in API_METHODS:
-                        logger.info(f"Skipping non-REST method {endpoint_id} of type: {raw_method_type}")
-                        # We still count it as 'processed' so it doesn't skew failure metrics, but we don't document it.
-                        methods_processed += 1
-                        continue
-                        
-                    method_info = {
-                        "class_name": meta.get("class_name") or (endpoint_id.split(":")[1] if len(endpoint_id.split(":")) > 1 else "Unknown"),
-                        "method_name": meta.get("name") or (endpoint_id.split(":")[2] if len(endpoint_id.split(":")) > 2 else "unknown"),
-                        "method_type": raw_method_type.lower(),
-                        # LLM writes 'path', fallback to 'method_path' for older docs
-                        "method_path": api_details.get("path") or api_details.get("method_path") or "/",
-                        "base_path": api_details.get("base_path") or "/",
-                        "method_definition": endpoint_doc.content
-                    }
-                    
-                    # 4. Fetch type definitions (DTOs/interfaces) referenced in the code
-                    type_context = self._fetch_type_context(endpoint_doc.content, dep_context)
-                    
-                    # 5. Build prompt and generate
-                    prompt = self._build_prompt(method_info, dep_context, type_context)
-                    documentation = LLMJsonHandler.parse_with_retry(generator=self.generator, prompt=prompt,max_retries=3)
-                    
-                    if documentation:
-                        method_name = method_info.get("method_name", "unknown")
-                        saved_files = self._save_outputs(method_name, documentation, method_info)
-                        output_files[method_name] = saved_files
-                        methods_processed += 1
-                    else:
-                        logger.error(f"Failed to generate docs for {endpoint_id}")
-                        methods_failed += 1
-                        
-                except Exception as e:
-                    logger.error(f"Error processing {endpoint_id}: {e}")
+                if not endpoint_doc_list:
+                    logger.error(f"Endpoint {endpoint_id} not found in Weaviate. Skipping.")
                     methods_failed += 1
+                    continue
+
+                endpoint_doc = endpoint_doc_list[0]
+                meta = endpoint_doc.meta
+
+                api_details_str = meta.get("api_method_details", "{}")
+                try:
+                    api_details = json.loads(api_details_str) if isinstance(api_details_str, str) else api_details_str
+                except Exception:
+                    api_details = {}
+                if not isinstance(api_details, dict):
+                    api_details = {}
+
+                raw_method_type = str(api_details.get("method_type", "unknown"))
+               
+                logger.info(f"Processing endpoint {endpoint_id} of type: {raw_method_type}")
+                # Check if this is an internal/RPC method like `grpc_method`
+                if raw_method_type.lower()  not in API_METHODS:
+                    logger.info(f"Skipping non-REST method {endpoint_id} of type: {raw_method_type}")
+                    # We still count it as 'processed' so it doesn't skew failure metrics, but we don't document it.
+                    methods_processed += 1
+                    continue
+                    
+                method_info = {
+                    "class_name": meta.get("class_name") or (endpoint_id.split(":")[1] if len(endpoint_id.split(":")) > 1 else "Unknown"),
+                    "method_name": meta.get("name") or (endpoint_id.split(":")[2] if len(endpoint_id.split(":")) > 2 else "unknown"),
+                    "method_type": raw_method_type.lower(),
+                    # LLM writes 'path', fallback to 'method_path' for older docs
+                    "method_path": api_details.get("path") or api_details.get("method_path") or "/",
+                    "base_path": api_details.get("base_path") or "/",
+                    "method_definition": endpoint_doc.content
+                }
+                
+                # 4. Fetch type definitions (DTOs/interfaces) referenced in the code
+                type_context = self._fetch_type_context(endpoint_doc.content, dep_context)
+                
+                # 5. Build prompt and generate
+                prompt = self._build_prompt(method_info, dep_context, type_context)
+                documentation = LLMJsonHandler.parse_with_retry(generator=self.generator, prompt=prompt,max_retries=3)
+                
+                if documentation:
+                    method_name = method_info.get("method_name", "unknown")
+                    saved_files = self._save_outputs(method_name, documentation, method_info)
+                    output_files[method_name] = saved_files
+                    methods_processed += 1
+                else:
+                    logger.error(f"Failed to generate docs for {endpoint_id}")
+                    methods_failed += 1
+                    
+            except Exception as e:
+                logger.error(f"Error processing {endpoint_id}: {e}")
+                methods_failed += 1
         
         result = {
             "methods_processed": methods_processed,

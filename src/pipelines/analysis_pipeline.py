@@ -1,12 +1,14 @@
 """
-AnalysisPipeline - Stage 2: AST-based controller extraction + code chunking.
+AnalysisPipeline - Stage 2: AST-based controller extraction + code chunking + dependency analysis.
 
-Pipeline flow (parallel branches):
-    files ──┬──→ ControllerExtractor ──→ endpoints
-            └──→ ASTCodeSplitter     ──→ code_chunks
+Pipeline flow (sequential):
+    files → ControllerExtractor → endpoints
+                                  └──→ ASTCodeSplitter (skips endpoint methods) → code_chunks
+    files → FilesAnalyzer → file_analysis (dependency mappings)
 
-Replaces the previous LLM-based FilesAnalyzer bottleneck with fast,
-deterministic AST extraction.
+ControllerExtractor runs first; its endpoints are passed to ASTCodeSplitter
+so that methods already captured as REST endpoints are not duplicated.
+FilesAnalyzer runs in parallel on the same files to extract dependency mappings.
 """
 
 from typing import List, Dict, Any
@@ -15,36 +17,42 @@ from haystack.core.pipeline import AsyncPipeline
 
 from src.components.extractor.controller_extractor import ControllerExtractor
 from src.components.ast_code_splitter import ASTCodeSplitter
+from src.components.FilesAnalyzer import FilesAnalyzer
 from src.utils.logger import DocGenLogger
 
 logger = DocGenLogger(__name__)
 
 
 class AnalysisPipeline:
-    """Runs AST-based endpoint extraction and code chunking on changed files."""
+    """Runs AST-based endpoint extraction, code chunking, and dependency analysis on changed files."""
 
-    def __init__(self):
-        self.pipeline = AsyncPipeline()
-        self._build()
+    def __init__(self, config_path: str = "config.yaml"):
+        self.pipeline = AsyncPipeline('AnalysisPipeline')
+        self._build(config_path)
 
-    def _build(self):
+    def _build(self, config_path: str):
         self.pipeline.add_component("controller_extractor", ControllerExtractor())
         self.pipeline.add_component("code_splitter", ASTCodeSplitter())
+        self.pipeline.add_component("files_analyzer", FilesAnalyzer(config_path=config_path))
+
+        # Wire controller endpoints → code_splitter for deduplication
+        self.pipeline.connect("controller_extractor.endpoints", "code_splitter.endpoints")
 
     def run(self, files: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
-        Analyze changed files via AST extraction.
+        Analyze changed files via AST extraction and LLM dependency analysis.
 
         Args:
             files: List of file dicts from IngestionPipeline.
 
         Returns:
-            endpoints: flat list of endpoint dicts
+            endpoints: flat list of ASTOutputRecord instances
             code_chunks: list of Haystack Document objects
+            file_analysis: list of dependency analysis results per file
         """
         if not files:
             logger.info("AnalysisPipeline: no changed files, skipping", location="run")
-            return {"endpoints": [], "code_chunks": []}
+            return {"endpoints": [], "code_chunks": [], "file_analysis": []}
 
         logger.info(f"AnalysisPipeline: analyzing {len(files)} file(s)", location="run")
 
@@ -52,22 +60,27 @@ class AnalysisPipeline:
             {
                 "controller_extractor": {"files": files},
                 "code_splitter": {"files": files},
+                "files_analyzer": {"files": files},
             },
-            include_outputs_from={"controller_extractor", "code_splitter"},
+            include_outputs_from={"controller_extractor", "code_splitter", "files_analyzer"},
         )
 
         extractor_out = result.get("controller_extractor", {})
         splitter_out = result.get("code_splitter", {})
+        analyzer_out = result.get("files_analyzer", {})
 
         endpoints = extractor_out.get("endpoints", [])
         code_chunks = splitter_out.get("documents", [])
+        file_analysis = analyzer_out.get("files", [])
 
         logger.info(
-            f"AnalysisPipeline: found {len(endpoints)} endpoints, {len(code_chunks)} code chunks",
+            f"AnalysisPipeline: found {len(endpoints)} endpoints, {len(code_chunks)} code chunks, "
+            f"{len(file_analysis)} file analyses",
             location="run",
         )
 
         return {
             "endpoints": endpoints,
             "code_chunks": code_chunks,
+            "file_analysis": file_analysis,
         }

@@ -61,7 +61,7 @@ ast_extractor:
 
 # Tree-sitter query paths
 queries:
-  general: "queries/controllers-extractors"
+  general: "queries/general"
   controllers: "queries/controllers-extractors"
 
 # API frameworks supported for documentation

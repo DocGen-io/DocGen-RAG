@@ -7,7 +7,7 @@ Pipeline flow:
     EndpointGraphManager ──────────┘
 
 WeaviateCodeWriter receives endpoints + code chunks from AnalysisPipeline.
-EndpointGraphManager builds dependency graphs from endpoint method bodies.
+EndpointGraphManager builds dependency graphs from file_analysis (FilesAnalyzer output).
 DocumentationCreator uses the graphs + Weaviate to generate docs.
 """
 
@@ -17,13 +17,14 @@ from haystack.core.pipeline import AsyncPipeline
 
 from src.components.WeaviateCodeWriter import WeaviateCodeWriter
 from src.components.EndpointGraphManager import EndpointGraphManager
-from src.components.FilesAnalyzer import FilesAnalyzer
 from src.components.DocumentationCreator import DocumentationCreator
 from src.components.DocumentationMerger import DocumentationMerger
 from src.components.WeaviateDocWriter import WeaviateDocWriter
 from src.components.FileHashSaver import FileHashSaver
 from src.utils.config_loader import load_config
+from src.utils.types import ASTOutputRecord
 from src.utils.logger import DocGenLogger
+
 
 logger = DocGenLogger(__name__)
 
@@ -43,10 +44,6 @@ class IndexingPipeline:
 
     def _build(self, weaviate_url: str, config_path: str):
         self.pipeline.add_component("weaviate_writer", WeaviateCodeWriter(weaviate_url=weaviate_url))
-        self.pipeline.add_component(
-            "files_analyzer",
-            FilesAnalyzer(weaviate_url=weaviate_url, config_path=config_path)
-        )
         self.pipeline.add_component("graph_manager", EndpointGraphManager())
         self.pipeline.add_component(
             "doc_creator",
@@ -59,10 +56,8 @@ class IndexingPipeline:
         )
         self.pipeline.add_component("file_hash_saver", FileHashSaver())
 
-        # Weaviate writer must finish BEFORE files_analyzer queries Weaviate
-        self.pipeline.connect("weaviate_writer.documents_written", "files_analyzer.wait_for_weaviate")
-        # files_analyzer → graph manager
-        self.pipeline.connect("files_analyzer.endpoints", "graph_manager.endpoints")
+        # Writer → doc creator
+        self.pipeline.connect("weaviate_writer.documents_written", "doc_creator.wait_for_weaviate")
         # Graph → doc creator
         self.pipeline.connect("graph_manager.endpoint_graphs", "doc_creator.endpoint_graphs")
         # Doc creator → merger
@@ -75,8 +70,9 @@ class IndexingPipeline:
 
     def run(
         self,
-        endpoints: List[Dict[str, Any]],
-        code_chunks: List[Document],
+        endpoints: List[ASTOutputRecord],
+        code_chunks: List[ASTOutputRecord],
+        file_analysis: List[Dict[str, Any]],
         pending_hashes: Dict[str, str],
         project_name: str,
         working_dir: str = "",
@@ -87,15 +83,18 @@ class IndexingPipeline:
         Args:
             endpoints: endpoint list from AnalysisPipeline (ControllerExtractor)
             code_chunks: Document list from AnalysisPipeline (ASTCodeSplitter)
+            file_analysis: dependency analysis from AnalysisPipeline (FilesAnalyzer)
             pending_hashes: hash map from IngestionPipeline
             project_name: used for namespacing output dirs
+            working_dir: resolved working directory
         """
         if not endpoints:
             logger.info("IndexingPipeline: no endpoints to index, skipping", location="run")
             return {"documents_stored": 0, "endpoints_merged": 0, "hashes_saved": 0}
 
         logger.info(
-            f"IndexingPipeline: indexing {len(endpoints)} endpoint(s), {len(code_chunks)} chunk(s)",
+            f"IndexingPipeline: indexing {len(endpoints)} endpoint(s), {len(code_chunks)} chunk(s), "
+            f"{len(file_analysis)} file analyses",
             location="run",
         )
 
@@ -105,13 +104,10 @@ class IndexingPipeline:
                     "endpoints": endpoints,
                     "code_chunks": code_chunks,
                 },
-                "files_analyzer": {
-                    "project_name": project_name,
-                    "endpoints": endpoints,
-                    "working_dir": working_dir,
-                },
                 "graph_manager": {
                     "project_name": project_name,
+                    "files": file_analysis,
+                    "endpoints": endpoints,
                 },
                 "doc_creator": {"project_name": project_name},
                 "doc_merger": {"project_name": project_name},
@@ -122,7 +118,6 @@ class IndexingPipeline:
             },
             include_outputs_from={
                 "weaviate_writer",
-                "files_analyzer",
                 "graph_manager",
                 "doc_creator",
                 "doc_merger",

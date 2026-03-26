@@ -24,6 +24,7 @@ from src.pipelines.indexing_pipeline import IndexingPipeline
 from src.utils.config_loader import load_config
 from src.utils.logger import DocGenLogger
 
+
 logger = DocGenLogger(__name__)
 
 
@@ -42,7 +43,7 @@ class DocumentationPipeline:
         self._setup_tracing()
 
         self.ingestion = IngestionPipeline()
-        self.analysis = AnalysisPipeline()
+        self.analysis = AnalysisPipeline(config_path)
         self.indexing = IndexingPipeline(config_path)
 
     def _setup_tracing(self):
@@ -81,7 +82,7 @@ class DocumentationPipeline:
             if not project_name:
                 project_name = "default_project"
 
-            logger.info(f"Starting pipeline for '{project_name}' ({source_type}:{path})", location="run")
+            logger.info(f"Starting pipeline for '{project_name}' ({source_type}:{path})", location="documentation_pipeline.run")
 
             # Stage 1: Ingest
             ingestion_out = self.ingestion.run(
@@ -96,22 +97,24 @@ class DocumentationPipeline:
             working_dir = ingestion_out.get("working_dir", "")
 
             if not files:
-                logger.info("No changed files — pipeline complete (no-op)", location="run")
+                logger.info("No changed files — pipeline complete (no-op)", location="documentation_pipeline.run")
                 return {"status": "completed", "files": 0, "message": "No changed files."}
 
-            # Stage 2: AST-based analysis (parallel controller extraction + code chunking)
+            # Stage 2: AST-based analysis (controller extraction + code chunking + dependency analysis)
             analysis_out = self.analysis.run(files=files)
             endpoints = analysis_out["endpoints"]
             code_chunks = analysis_out["code_chunks"]
+            file_analysis = analysis_out["file_analysis"]
 
             if not endpoints:
                 logger.info("No REST endpoints found — pipeline complete (no-op)", location="run")
                 return {"status": "completed", "files": len(files), "message": "No REST endpoints found."}
 
-            # Stage 3: Index endpoints + chunks into documentation
+            # Stage 3: Index endpoints + chunks + dependency graphs into documentation
             indexing_out = self.indexing.run(
                 endpoints=endpoints,
                 code_chunks=code_chunks,
+                file_analysis=file_analysis,
                 pending_hashes=pending_hashes,
                 project_name=project_name,
                 working_dir=working_dir,
