@@ -1,23 +1,14 @@
-"""
-EndpointGraphManager - Haystack component for managing dependency graphs
-and persisting them to a lightweight SQLite database.
-
-Updated to work with AST-extracted endpoints from ControllerExtractor
-and resolve dependencies via Weaviate code chunks.
-"""
-from haystack import component
-from typing import Dict, Set, List, Any, Optional
 import json
-import sqlite3
 import os
-import re
-from src.utils.dependency_graph import DependencyGraph
+import sqlite3
+from haystack import component
 from src.utils.logger import DocGenLogger
+from src.utils.types import ASTOutputRecord
+from typing import Dict, Set, List, Any, Optional
+from src.utils.dependency_graph import DependencyGraph
+from src.utils.weaviate_utils import get_node_id
 
 logger = DocGenLogger(__name__)
-
-
-
 
 
 @component
@@ -139,174 +130,175 @@ class EndpointGraphManager:
             for target in targets:
                 self.write_dependency(endpoint_id, caller, target)
 
-    def _create_node_id(self, file_path: str, origin: str, name: str, method_type: str = "unknown") -> str:
-        """Create a unique composite key: file_name:origin:name:method_type"""
-        file_name = os.path.basename(file_path) if file_path else "unknown_file"
-        origin_str = origin if origin else "unknown_origin"
-        name_str = name if name else "unknown_name"
-        method_str = method_type if method_type else "unknown"
-        return f"{file_name}:{origin_str}:{name_str}:{method_str}"
-
     @component.output_types(endpoint_graphs=Dict[str, Any])
     def run(
         self,
-        endpoints: Optional[List[Dict[str, Any]]] = None,
+        endpoints: Optional[List[ASTOutputRecord]] = None,
         project_name: str = "",
         files: Optional[List[Dict[str, Any]]] = None,
-        code_chunks: Optional[Any] = None,
+        code_chunks: Optional[List[ASTOutputRecord]] = None,
+        wait_for_weaviate: Optional[int] = None
     ) -> Dict[str, Dict[str, Any]]:
         """
-        Build dependency graphs for each endpoint.
-
-        Supports two modes:
-        1. AST mode: receives `endpoints` from ControllerExtractor
-        2. Legacy mode: receives `files` from FilesAnalyzer
-
-        Args:
-            endpoints: flat list of endpoint dicts from ControllerExtractor
-            project_name: project name for DB path
-            files: legacy FilesAnalyzer output
-            code_chunks: code chunk documents (unused directly, but triggers DAG ordering)
+        Build dependency graphs for each endpoint using FilesAnalyzer output,
+        resolving node_ids exactly via Weaviate get_node_id and AST records.
         """
-        # Set up project-specific DB path
         output_dir = os.path.join("output", project_name)
         os.makedirs(output_dir, exist_ok=True)
         self.db_path = os.path.join(output_dir, self.default_db_name)
         self._init_db()
 
-        # --- AST-based mode (new) ---
-        if endpoints:
-            return self._run_ast_mode(endpoints)
+        if not files or not endpoints:
+            logger.warning("No endpoints or files provided to EndpointGraphManager")
+            return {"endpoint_graphs": {}}
 
-        # --- Legacy mode (FilesAnalyzer) ---
-        if files:
-            return self._run_legacy_mode(files)
+        return self._build_graphs(files, endpoints, code_chunks or [])
 
-        logger.warning("No endpoints or files provided to EndpointGraphManager")
-        return {"endpoint_graphs": {}}
+    def _build_graphs(
+        self, 
+        files: List[Dict[str, Any]], 
+        endpoints: List[ASTOutputRecord], 
+        code_chunks: List[ASTOutputRecord]
+    ) -> Dict[str, Dict[str, Any]]:
+        self.endpoint_graphs = {}
 
-    def _run_ast_mode(self, endpoints: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
-        """Build graphs from AST-extracted endpoints."""
-        for ep in endpoints:
-            endpoint_id = ep.get("node_id") or self._create_node_id(
-                ep.get("file_path", ""), ep.get("class_name", ""), ep.get("method_name", ""), ep.get("method_type", "unknown")
-            )
+        # 1. Build AST catalogs to resolve missing origin/file_name from FilesAnalyzer
+        ast_by_file_method = {}   # (f_name, m_name) -> node_id, class_name
+        ast_by_class_method = {}  # (c_name, m_name) -> node_id
 
-            graph = DependencyGraph(start_node=endpoint_id)
-
-            # Extract references from LLM output
-            raw_deps = ep.get("dependencies", [])
-
-            # Add each reference as a dependency edge
-            for ref in raw_deps:
-                # Handle both string references and dict-based dependencies
-                if isinstance(ref, dict):
-                    target_id = self._parse_dependency_id(ref, ep.get("file_path", ""))
-                elif isinstance(ref, str):
-                    try:
-                        parsed = json.loads(ref)
-                        target_id = self._parse_dependency_id(parsed, ep.get("file_path", ""))
-                    except Exception:
-                        target_id = ref
-                else:
-                    target_id = str(ref)
+        for record in endpoints + code_chunks:
+            file_name_val = record.get("file_path") or record.get("file_name")
+            m_name_val = record.get("method_name")
+            
+            if not file_name_val or not m_name_val:
+                logger.warning(f"Skipping AST record due to missing file_name or method_name: {record}")
+                continue
                 
-                graph.add_dependency(endpoint_id, target_id)
+            original_f_name = os.path.basename(file_name_val)
+            f_name = original_f_name.lower()
+            
+            c_name_val = record.get("class_name") or "Global"
+            c_name = c_name_val.lower()
+            m_name = m_name_val.lower()
+            
+            node_id = get_node_id(
+                file_name=original_f_name, 
+                class_name=c_name_val, 
+                method_name=m_name_val, 
+                method_type=record.get('method_type', 'unknown')
+            )
+            
+            ast_by_file_method[(f_name, m_name)] = {
+                "node_id": node_id,
+                "class_name": c_name_val
+            }
+                
+            ast_by_class_method[(c_name, m_name)] = node_id
 
-            self.endpoint_graphs[endpoint_id] = graph
-            self._sync_graph_to_db(endpoint_id, graph)
-
-        logger.info(f"Built {len(self.endpoint_graphs)} endpoint graphs (AST mode)")
-        return {"endpoint_graphs": self.endpoint_graphs}
-
-    def _run_legacy_mode(self, files: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
-        """Build graphs from legacy FilesAnalyzer output."""
-        all_components = {}
-        name_index: Dict[str, str] = {}
-        endpoint_ids = []
-
+        # 2. Process FilesAnalyzer output to map each known node_id to its dependencies
+        analyzer_deps: Dict[str, List[str]] = {}
+        files_analyzer_catalog: Dict[tuple[str, str], str] = {} # (origin.lower(), name.lower()) -> node_id
+        raw_deps_map: Dict[str, List[Dict[str, Any]]] = {}      # node_id -> raw dependencies
+        
+        # Pass A: generate all node_ids for filesAnalyzer items and build the catalog
         for file_info in files:
-            file_path = file_info.get("file_path", "")
-            content = file_info.get("content", [])
+            file_path = file_info.get("file_path")
+            if not file_path:
+                logger.warning(f"Skipping filesAnalyzer file due to missing file_path: {file_info}")
+                continue
+                
+            f_name = os.path.basename(file_path).lower()
+            original_f_name = os.path.basename(file_path)
 
-            for item in content:
-                name = item.get("name")
-                if not name:
+            for item in file_info.get("content", []):
+                item_name = item.get("name")
+                if not item_name:
+                    logger.warning(f"Skipping filesAnalyzer item due to missing method_name in {file_path}")
                     continue
+                    
+                m_name = item_name.lower()
+                
+                ast_info = ast_by_file_method.get((f_name, m_name))
+                if ast_info:
+                    curr_node_id = ast_info["node_id"]
+                else:
+                    # Fallback if NOT found in AST chunks
+                    origin = item.get("origin") or "Global"
+                    
+                    method_type = "unknown"
+                    is_api = item.get("is_api_method")
+                    if is_api and isinstance(is_api, dict):
+                        method_type = is_api.get("method_type", "unknown")
+                        
+                    curr_node_id = get_node_id(original_f_name, origin, item_name, method_type)
 
-                origin = item.get("class_name", item.get("type", ""))
-                component_id = self._create_node_id(file_path, origin, name)
+                # Register in catalog by (origin, name)
+                item_origin = item.get("origin") or "Global"
+                files_analyzer_catalog[(item_origin.lower(), m_name)] = curr_node_id
+                
+                # Store raw dependencies for Pass B
+                raw_deps_map[curr_node_id] = item.get("dependencies", [])
+                
+        # Pass B: resolve dependencies using the catalog exclusively
+        for curr_node_id, raw_deps in raw_deps_map.items():
+            deps = []
+            for dep in raw_deps:
+                dep_origin = dep.get("dependency_origin") or "Global"
+                dep_name = dep.get("dependency_name")
+                
+                if not dep_name:
+                    continue # Skip invalid dependencies
+                    
+                dep_type = dep.get("dependency_type")
+                
+                dep_c_name = dep_origin.lower()
+                dep_m_name = dep_name.lower()
+                
+                # Resolve Target Node ID exclusively within the filesAnalyzer items
+                target_node_id = files_analyzer_catalog.get((dep_c_name, dep_m_name))
+                
+                if target_node_id:
+                    deps.append(target_node_id)
+                else:
+                    logger.debug(f"Dependency {dep_origin}:{dep_name} not found in analyzed files. Skipping.")
+            
+            analyzer_deps[curr_node_id] = deps
 
-                item_with_context = item.copy()
-                item_with_context["_source_file_path"] = file_path
-                all_components[component_id] = item_with_context
-                name_index[name] = component_id
+        # 3. Traverse from each Endpoint as root
+        for ep in endpoints:
+            file_name_val = ep.get('file_name')
+            m_name_val = ep.get('method_name')
+            
+            if not file_name_val or not m_name_val:
+                logger.warning(f"Skipping root endpoint due to missing file_name or method_name: {ep}")
+                continue
+                
+            ep_node_id = get_node_id(
+                file_name=file_name_val, 
+                class_name=ep.get('class_name') or 'Global', 
+                method_name=m_name_val, 
+                method_type=ep.get('method_type', 'unknown')
+            )
+            
+            graph = DependencyGraph(start_node=ep_node_id)
+            visited = set()
+            queue = [ep_node_id]
+            
+            while queue:
+                curr = queue.pop(0)
+                if curr in visited:
+                    continue
+                visited.add(curr)
+                
+                deps = analyzer_deps.get(curr, [])
+                graph.update_dependencies(curr, deps)
+                
+                for d in deps:
+                    if d not in visited:
+                        queue.append(d)
+                        
+            self.endpoint_graphs[ep_node_id] = graph
+            self._sync_graph_to_db(ep_node_id, graph)
 
-                if item.get("is_api_method") and str(item.get("type", "")).lower() == "function":
-                    endpoint_ids.append(component_id)
-
-        for endpoint_id in endpoint_ids:
-            graph = DependencyGraph(start_node=endpoint_id)
-            self.endpoint_graphs[endpoint_id] = graph
-            self._populate_subgraph(graph, endpoint_id, all_components, name_index, set())
-            self._sync_graph_to_db(endpoint_id, graph)
-
+        logger.info(f"Built {len(self.endpoint_graphs)} endpoint graphs")
         return {"endpoint_graphs": self.endpoint_graphs}
-
-    def _resolve_dependency(self, dep: Any, name_index: Dict[str, str], current_file_path: str) -> str:
-        """Resolve a dependency to the actual indexed component ID."""
-        dep_name = None
-        if isinstance(dep, dict):
-            dep_name = dep.get('dependency_name', '')
-        elif isinstance(dep, str):
-            try:
-                parsed = json.loads(dep)
-                dep_name = parsed.get('dependency_name', '')
-            except Exception:
-                dep_name = dep
-
-        if dep_name and dep_name in name_index:
-            return name_index[dep_name]
-
-        return self._parse_dependency_id(dep, current_file_path)
-
-    def _parse_dependency_id(self, dep: Any, current_file_path: str) -> str:
-        """Parse a dependency object/string into the composite node ID."""
-        if isinstance(dep, dict):
-            if "target_node_id" in dep and dep["target_node_id"]:
-                return dep["target_node_id"]
-            file_path = dep.get('file_path', current_file_path)
-            return self._create_node_id(file_path, dep.get('dependency_origin', ''), dep.get('dependency_name', ''), dep.get('method_type', 'unknown'))
-        elif isinstance(dep, str):
-            try:
-                parsed = json.loads(dep)
-                file_path = parsed.get('file_path', current_file_path)
-                return self._create_node_id(file_path, parsed.get('dependency_origin', ''), parsed.get('dependency_name', ''), parsed.get('method_type', 'unknown'))
-            except Exception:
-                return self._create_node_id(current_file_path, "unknown_origin", dep)
-        return str(dep)
-
-    def _populate_subgraph(
-        self,
-        graph: DependencyGraph,
-        current_node_id: str,
-        all_components: Dict[str, Any],
-        name_index: Dict[str, str],
-        visited: Set[str]
-    ) -> None:
-        """Recursively pulls nested dependencies into the start node's graph."""
-        if current_node_id in visited:
-            return
-        visited.add(current_node_id)
-
-        item = all_components.get(current_node_id)
-        if not item:
-            return
-
-        source_file_path = item.get("_source_file_path", "")
-        raw_deps = item.get("dependencies", [])
-        string_deps = [self._resolve_dependency(d, name_index, source_file_path) for d in raw_deps]
-        graph.update_dependencies(current_node_id, string_deps)
-
-        for target_id in string_deps:
-            self._populate_subgraph(graph, target_id, all_components, name_index, visited)
