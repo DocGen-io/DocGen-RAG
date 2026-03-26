@@ -1,0 +1,17 @@
+model,language,framework,repo_url,success,execution_time_seconds,valid_openapi,files_processed,error,expected_paths_count,generated_paths_count,path_match_count,path_recall,path_precision,expected_methods_count,generated_methods_count,method_match_count,method_recall,method_precision
+llama3,typescript,Express & Firestore,https://github.com/marcusmonteirodesouza/typescript-firestore-terraform-realworld-backend,True,99.2,False,27,,12,8,1,0.0833,0.125,19,8,1,0.0526,0.125
+llama3,typescript,Express + Knex.js + AWS Lambda,https://github.com/kenyipp/realworld-nodejs-example-app,True,306.66,False,145,,12,25,1,0.0833,0.04,19,30,1,0.0526,0.0333
+llama3,typescript,Express + PostgreSQL + Drizzle + Docker,https://github.com/AhmedFawzy31/realworld-express-postgresql-drizzle,True,355.87,False,43,,12,48,9,0.75,0.1875,19,62,14,0.7368,0.2258
+llama3,typescript,Neo4j + NestJS,https://github.com/neo4j-examples/nestjs-neo4j-realworld-example,True,405.15,False,31,,12,59,10,0.8333,0.1695,19,78,16,0.8421,0.2051
+llama3,typescript,NestJS + MikroORM,https://github.com/mikro-orm/nestjs-realworld-example-app,True,462.12,False,37,,12,57,11,0.9167,0.193,19,75,17,0.8947,0.2267
+llama3,typescript,NestJS + TypeORM,https://github.com/lujakob/nestjs-realworld-example-app,True,535.63,False,35,,12,63,11,0.9167,0.1746,19,81,17,0.8947,0.2099
+llama3,typescript,Nitro + Prisma + Zod,https://github.com/realworld-apps/nitro-prisma-zod-realworld-example-app,True,585.92,False,43,,12,63,11,0.9167,0.1746,19,81,17,0.8947,0.2099
+llama3,Java,Spring Boot + MyBatis,https://github.com/joyheros/realworld,True,847.34,False,83,,12,76,11,0.9167,0.1447,19,96,17,0.8947,0.1771
+llama3,Java,Spring Boot + Spring Data JDBC,https://github.com/alexey-lapin/realworld-backend-spring,True,921.6,False,174,,12,86,11,0.9167,0.1279,19,106,17,0.8947,0.1604
+llama3,Java,Spring Boot + Spring Data JPA + DDD,https://github.com/borovikovd/realworld-backend-spring-ddd,True,829.09,False,36,,12,93,12,1.0,0.129,19,116,18,0.9474,0.1552
+llama3,Java,Spring Boot + Spring Data JPA + PostgreSQL,https://github.com/marcusmonteirodesouza/realworld-backend-spring-boot-java-keycloak-postgresql,True,899.26,False,45,,12,91,12,1.0,0.1319,19,115,18,0.9474,0.1565
+llama3,Java,Spring Boot + WebFlux + MongoDB,https://github.com/a-mountain/realworld-spring-webflux,True,1142.82,False,66,,12,109,12,1.0,0.1101,19,138,19,1.0,0.1377
+llama3,C#,.NET + Minimal API,https://github.com/Erikvdv/realworldapiminimal,True,1213.44,False,42,,12,118,12,1.0,0.1017,19,153,19,1.0,0.1242
+llama3,C#,ASP.NET Core,https://github.com/gothinkster/aspnetcore-realworld-example-app,True,1239.31,False,64,,12,119,12,1.0,0.1008,19,154,19,1.0,0.1234
+llama3,C#,ASP.NET Core + Couchbase,https://github.com/mgroves/realworld-aspnet-couchbase,True,1397.61,False,130,,12,139,12,1.0,0.0863,19,174,19,1.0,0.1092
+llama3,C#,ASP.NET Core + Microservices,https://github.com/profjordanov/realworld-microservices,True,1334.13,False,73,,12,145,12,1.0,0.0828,19,180,19,1.0,0.1056

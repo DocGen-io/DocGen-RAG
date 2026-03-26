@@ -158,9 +158,13 @@ class SwaggerBuilder(OutputFormatBuilder):
             schema = self._normalize_schema(schema)
             
             # OpenAPI 3.0 limits complex objects inside 'query' unless `style`/`explode` are configured.
-            # If the LLM generates a giant deep object schema for a query param, it usually meant to
-            # create a requestBody. We simplify it back to a string to prevent Swagger UI from crashing.
-            if loc == "query" and schema.get("type") == "object" and "properties" in schema:
+            if loc == "query" and schema.get("type") == "object":
+                if "properties" not in schema:
+                    # Opaque DTO ref (no properties, just a description like "Object of type PaginationQueryDto").
+                    # Drop it entirely — it carries no useful information and confuses Swagger UI.
+                    logger.warning(f"Dropping opaque object query parameter '{name}' (no properties). Likely an unexpanded DTO.")
+                    continue
+                # Has real properties — flatten to string to prevent Swagger UI from crashing.
                 logger.warning(f"Flattening complex object query parameter '{name}' to string. (Did LLM mean requestBody?)")
                 schema = {"type": "string", "description": "Serialized object data"}
 
@@ -251,9 +255,22 @@ class SwaggerBuilder(OutputFormatBuilder):
             if not isinstance(ref_val, str):
                 return {"type": "object"}
             type_name = ref_val.split("/")[-1].replace("[]", "")
+            item_schema = {"type": "object", "description": f"Object of type {type_name}", "x-uncertain": True}
             if "[]" in ref_val:
-                return {"type": "array", "items": {"type": "object", "description": f"Item of {type_name}"}}
-            return {"type": "object", "description": f"Object of type {type_name}"}
+                return {"type": "array", "items": item_schema}
+            return item_schema
+        
+        # Opaque schema: type object/array with only a description and no properties/items
+        # (e.g., already-inlined $refs). Mark as uncertain so the user knows it's a prediction.
+        schema_type = schema.get("type")
+        if (
+            schema_type in ("object", "array")
+            and "description" in schema
+            and "properties" not in schema
+            and "items" not in schema
+            and "x-uncertain" not in schema
+        ):
+            schema["x-uncertain"] = True
         
         # Recursively process nested schemas
         result = {}
@@ -301,10 +318,44 @@ class SwaggerBuilder(OutputFormatBuilder):
         """Normalize a single Response Object. See: https://swagger.io/specification/#response-object"""
         res = {"description": r.get("description", "Response")}
         if "content" in r:
-            res["content"] = {mt: {"schema": self._normalize_schema(obj.get("schema", {}))} for mt, obj in r["content"].items() if isinstance(obj, dict)}
+            content = {}
+            for mt, obj in r["content"].items():
+                if isinstance(obj, dict):
+                    schema = self._normalize_schema(obj.get("schema", {}))
+                    # Drop content if schema is empty or carries no useful info
+                    if self._is_empty_schema(schema):
+                        continue
+                    content[mt] = {"schema": schema}
+            if content:
+                res["content"] = content
         elif "schema" in r:
-            res["content"] = {"application/json": {"schema": self._normalize_schema(r["schema"])}}
+            schema = self._normalize_schema(r["schema"])
+            if not self._is_empty_schema(schema):
+                res["content"] = {"application/json": {"schema": schema}}
         return res
+
+    def _is_empty_schema(self, schema: Dict[str, Any]) -> bool:
+        """
+        Returns True if the schema carries no useful information:
+        - Empty dict {}
+        - Only contains x-uncertain with no description (purely a flag, nothing to show)
+        - type: array with items that are themselves empty or only x-uncertain
+        - type: object/array with no properties, no description (just a bare type)
+        """
+        if not schema:
+            return True
+        keys = set(schema.keys()) - {"x-uncertain"}
+        if not keys:
+            return True  # Only had x-uncertain flag, no content
+        # type: array with no useful items
+        if schema.get("type") == "array":
+            items = schema.get("items")
+            if items is None or items == {}:
+                return True
+        # type: object/array with empty properties
+        if schema.get("type") == "object" and schema.get("properties") == {}:
+            return True
+        return False
     
     def validate(self, output: Dict[str, Any]) -> bool:
         """Validate that output has required OpenAPI 3.0 fields."""

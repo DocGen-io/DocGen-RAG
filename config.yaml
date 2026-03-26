@@ -13,6 +13,7 @@ rag:
 WEAVIATE_URL: "http://127.0.0.1:8080"
 WEAVIATE_API_KEY: null
 tracing: true
+phoenix_data_dir: "~/.phoenix_data"
 
 
 # code mapper settings
@@ -20,6 +21,7 @@ tracing: true
 code_analyzer:
   active_generator: "ollama"
   analyzer_output_path: "analyzer_output"
+  dependency_search_top_k: 100
 
 
 generators:
@@ -51,7 +53,17 @@ app:
   environment: "development"
 
 
+# AST Extractor settings
+ast_extractor:
+  save_ast: true
+  save_ast_path: "analyzer_output/ast"
+  verbose: false
+
+# Tree-sitter query paths
+queries:
+  general: "queries/general"
+  controllers: "queries/controllers-extractors"
+
 # API frameworks supported for documentation
 api_frameworks: ["NestJS", "SpringBoot", ".NET"]
-
-
+languages: ["typescript", "java", "c_sharp"]

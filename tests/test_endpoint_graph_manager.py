@@ -9,7 +9,10 @@ def temp_db_path(tmp_path):
 
 @pytest.fixture
 def graph_manager(temp_db_path):
-    return EndpointGraphManager(db_path=temp_db_path)
+    gm = EndpointGraphManager()
+    gm.db_path = temp_db_path
+    gm._init_db()
+    return gm
 
 @pytest.fixture
 def populate_db(graph_manager):

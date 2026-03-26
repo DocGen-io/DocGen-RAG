@@ -4,18 +4,17 @@ SourceHandler - Haystack component for handling input sources.
 Handles git repositories and local folders, collecting file paths for processing.
 """
 import os
+import git
 import shutil
 import tempfile
 from pathlib import Path
-from typing import List, Dict, Any, Optional
-
 from haystack import component
-
+from src.utils.logger import DocGenLogger
+from typing import List, Dict, Any, Optional
 from src.components.LanguageFinder import LanguageFinder
 from src.utils.llm_ignore_parser import get_llm_ignore_filter
-from src.utils.logger import DocGenLogger
 
-logger = DocGenLogger()
+logger = DocGenLogger(__name__)
 
 
 @component
@@ -51,15 +50,13 @@ class SourceHandler:
             Dictionary containing collected files and the working directory.
         """
         working_dir = self._prepare_working_directory(source_type, path, credentials)
-        
-        self._apply_local_llmignore(working_dir)
 
         # Analyze api directory, in-case of monorepo
 
         if(api_dir):
             working_dir= os.path.join(working_dir,api_dir)
-            # Ensure .llmignore is available in the api subdirectory too
-            self._apply_local_llmignore(working_dir)
+        
+        self._apply_local_llmignore(working_dir)
         files = self._collect_files(working_dir)
 
         if not files:
@@ -95,7 +92,6 @@ class SourceHandler:
     
     def _clone_repo(self, repo_url: str, credentials: Optional[str] = None) -> str:
         """Clone git repository to temp directory."""
-        import git
         
         self.temp_dir = tempfile.mkdtemp(prefix="docgen_")
         final_url = repo_url

@@ -11,6 +11,7 @@ from haystack.dataclasses import Document
 from src.components.DocumentationCreator import DocumentationCreator
 from src.utils.dependency_graph import DependencyGraph
 from src.utils.llm_json_handler import LLMJsonHandler
+from src.utils.weaviate_utils import fetch_by_node_id
 
 class TestDocumentationCreatorInput:
     """Test how DocumentationCreator handles its new inputs."""
@@ -48,18 +49,23 @@ class TestDocumentationCreatorContextFetching:
             creator.document_store = Mock()
             creator.generator = Mock()
             creator.output_dir = "temp"
+            creator.weaviate_url = "http://fake"
             
-            with patch.object(LLMJsonHandler, 'parse_with_retry', return_value={"swagger": {"summary": "test"}}):
-                with patch.object(creator, '_save_outputs', return_value={"swagger": "path/file.json"}):
-                    result = creator.run(endpoint_graphs={"controller.ts:TestController:myEndpoint": graph})
-                    
-                    assert result["methods_processed"] == 1
-                    
-                    # Verify `fetch_by_node_id` was queried for the controller and the service
-                    assert mock_fetch.call_count == 3
-                    
-                    calls = [
-                        call(creator.document_store, "controller.ts:TestController:myEndpoint"),
+            with patch('src.components.DocumentationCreator.get_weaviate_store') as mock_weaviate:
+                # Mock the context manager to yield creator.document_store
+                mock_weaviate.return_value.__enter__.return_value = creator.document_store
+                
+                with patch.object(LLMJsonHandler, 'parse_with_retry', return_value={"swagger": {"summary": "test"}}):
+                    with patch.object(creator, '_save_outputs', return_value={"swagger": "path/file.json"}):
+                        result = creator.run(endpoint_graphs={"controller.ts:TestController:myEndpoint": graph})
+                        
+                        assert result["methods_processed"] == 1
+                        
+                        # Verify `fetch_by_node_id` was queried for the controller and the service
+                        assert mock_fetch.call_count == 3
+                        
+                        calls = [
+                            call(creator.document_store, "controller.ts:TestController:myEndpoint"),
                         call(creator.document_store, "service.ts:TestService:findAll"),
                         call(creator.document_store, "controller.ts:TestController:myEndpoint")
                     ]
@@ -92,7 +98,6 @@ class TestOutputFileStructure:
 class TestWeaviateFilterQuery:
     """Test fetch_by_node_id utility."""
     def test_fetch_by_node_id_filter_structure(self):
-        from src.utils.weaviate_utils import fetch_by_node_id
         mock_store = Mock()
         mock_store.filter_documents.return_value = []
         

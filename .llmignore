@@ -17,6 +17,14 @@ package-lock.json
 yarn.lock
 pnpm-lock.yaml
 tsconfig.build.json
+.tsbuildinfo
+out/
+out-tsc/
+.next/
+nuxt/
+.svelte-kit/
+.husky/
+.nyc_output/
 
 # Test files & Mocks
 *.spec.ts
@@ -34,6 +42,17 @@ mvnw
 mvnw.cmd
 gradlew
 gradlew.bat
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+.bsp/
+.classpath
+.project
+.settings/
+HELP.md
+lombok.config
 
 # --- .NET / C# ---
 bin/
@@ -42,6 +61,17 @@ TestResults/
 .vs/
 *.csproj.user
 *.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.pdb
+*.dll
+*.exe
+*.cache
+packages/
+.nuget/
+[Bb]in/
+[Oo]bj/
 
 # Test Projects (common naming conventions)
 *Tests/
@@ -61,3 +91,44 @@ jest.config.*
 nest-cli.json
 README.md
 LICENSE
+
+# --- Media & Assets ---
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+*.mp4
+*.pdf
+*.zip
+*.tar.gz
+*.woff
+*.woff2
+*.ttf
+*.eot
+
+# --- Documentation ---
+docs/
+swagger/
+
+# --- CI/CD ---
+.github/
+.gitlab/
+.circleci/
+
+# --- Frontend / Static Assets (when repository is full-stack) ---
+public/
+web/
+client/
+frontend/
+ui/
+assets/
+images/
+
+# --- Database / Migrations (Usually not containing endpoints) ---
+Migrations/
+migrations/
+db/migrations/
+liquibase/
+flyway/

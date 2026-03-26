@@ -39,10 +39,9 @@ class WeaviateDocWriter:
             "embedding_model", "sentence-transformers/all-MiniLM-L6-v2"
         )
 
-        self.doc_store = WeaviateDocumentStore(url=weaviate_url)
+        self.weaviate_url = weaviate_url
         self.embedder = SentenceTransformersDocumentEmbedder(model=embedding_model)
         self.embedder.warm_up()
-        self.doc_writer = DocumentWriter(document_store=self.doc_store)
 
     def _swagger_files_to_documents(
         self, output_files: Dict[str, Dict[str, str]]
@@ -106,8 +105,12 @@ class WeaviateDocWriter:
         embedded = self.embedder.run(documents=documents)
         embedded_docs = embedded.get("documents", documents)
 
+        from src.utils.weaviate_utils import get_weaviate_store
+
         # Write to Weaviate
-        self.doc_writer.run(documents=embedded_docs)
+        with get_weaviate_store(url=self.weaviate_url) as doc_store:
+            doc_writer = DocumentWriter(document_store=doc_store)
+            doc_writer.run(documents=embedded_docs)
 
         logger.info(f"WeaviateDocWriter: stored {len(embedded_docs)} endpoint docs")
         return {"documents_written": len(embedded_docs)}

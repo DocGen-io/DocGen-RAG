@@ -10,7 +10,7 @@ along with pending_hashes that will be committed after successful indexing.
 
 from typing import Optional, Dict, Any
 
-from haystack.core.pipeline import AsyncPipeline
+from haystack.core.pipeline import Pipeline
 
 from src.components.SourceHandler import SourceHandler
 from src.components.FileHasher import FileHasher
@@ -23,7 +23,7 @@ class IngestionPipeline:
     """Fetches source files and filters to only changed ones via hashing."""
 
     def __init__(self):
-        self.pipeline = AsyncPipeline()
+        self.pipeline = Pipeline("ingestion_pipeline")
         self._build()
 
     def _build(self):
@@ -68,4 +68,5 @@ class IngestionPipeline:
         return {
             "files": hasher_out.get("files", []),
             "pending_hashes": hasher_out.get("pending_hashes", {}),
+            "working_dir": hasher_out.get("working_dir", ""),
         }

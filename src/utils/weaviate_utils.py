@@ -9,6 +9,7 @@ from typing import List, Optional
 from haystack.dataclasses import Document
 from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
 from .logger import DocGenLogger
+
 logger = DocGenLogger(__name__)
 
 
@@ -44,6 +45,9 @@ def fetch_by_method_name(
         logger.error(f"Error fetching documents for method {method_name}: {e}")
         return []
 
+
+def get_node_id(file_name: str,class_name: str, method_name: str="none",method_type:str = "unknown") -> str:
+    return f"{file_name.lower()}:{class_name.lower()}:{method_name.lower()}:{method_type.lower()}"
 
 def fetch_by_class_name(
     document_store: WeaviateDocumentStore,
@@ -104,3 +108,24 @@ def fetch_by_node_id(
     except Exception as e:
         logger.error(f"Error fetching documents for node_id {node_id}: {e}")
         return []
+
+from contextlib import contextmanager
+
+@contextmanager
+def get_weaviate_store(url: str = "http://127.0.0.1:8080", **kwargs):
+    """
+    Context manager to initialize and automatically close WeaviateDocumentStore.
+    Produces DRY, reliable connection handling.
+    """
+    store = WeaviateDocumentStore(url=url, **kwargs)
+    try:
+        yield store
+    finally:
+        try:
+            # Explicitly close the connection to stop the ResourceWarnings
+            if hasattr(store, "_client") and hasattr(store._client, "close"):
+                store._client.close()
+            elif hasattr(store, "close"):
+                store.close()
+        except Exception as e:
+            logger.error(f"Failed to close WeaviateDocumentStore: {e}")

@@ -78,17 +78,17 @@ class TestSwaggerBuilder:
 class TestDocumentationMerger:
     def test_creates_files(self, temp_output_dir):
         from src.components.DocumentationMerger import DocumentationMerger
-        result = DocumentationMerger().run(output_dir=temp_output_dir)
+        result = DocumentationMerger().run(project_name="test_proj", output_dir=temp_output_dir)
         assert os.path.exists(result["swagger_path"]) 
         assert result["endpoints_merged"] == 2
     
     def test_empty_dir(self, empty_output_dir):
         from src.components.DocumentationMerger import DocumentationMerger
-        assert DocumentationMerger().run(output_dir=empty_output_dir)["endpoints_merged"] == 0
+        assert DocumentationMerger().run(project_name="test_proj", output_dir=empty_output_dir)["endpoints_merged"] == 0
     
     def test_swagger_valid(self, temp_output_dir):
         from src.components.DocumentationMerger import DocumentationMerger
-        result = DocumentationMerger().run(output_dir=temp_output_dir)
+        result = DocumentationMerger().run(project_name="test_proj", output_dir=temp_output_dir)
         data = json.load(open(result["swagger_path"]))
         assert all(k in data for k in ["openapi", "paths"])
     

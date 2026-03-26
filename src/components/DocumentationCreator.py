@@ -20,6 +20,7 @@ from haystack.dataclasses import ChatMessage
 from prompts import doc_creator_system_prompt, doc_creator_user_prompt
 from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
 from src.utils.definitions import API_METHODS
+
 logger = DocGenLogger(__name__)
 
 
@@ -51,7 +52,6 @@ class DocumentationCreator:
         
         context_parts = []
         for node_id in node_ids:
-            # Fetch from Weaviate using composite ID
             docs = fetch_by_node_id(self.document_store, node_id)
             
             if docs:
@@ -160,8 +160,12 @@ class DocumentationCreator:
             logger.info(f"Processing endpoint graph: {endpoint_id}")
 
             try:
-                # 1. Gather all nodes involved in this endpoint (including the endpoint itself)
-                node_ids = list(graph.get_all_nodes())
+                # 1. Gather all internal dependencies (excluding the endpoint itself to save tokens)
+                node_ids = [n for n in graph.get_all_nodes() if n != endpoint_id]
+
+
+                for noed_id in node_ids:
+                    logger.info(f"Found dependency: {noed_id}")
 
                 # 2. Fetch context from Weaviate for all nodes
                 dep_context = self._fetch_dependency_context(node_ids)

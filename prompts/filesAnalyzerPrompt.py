@@ -1,32 +1,83 @@
 from string import Template
 
-# System prompt: static rules, schema, anti-hallucination constraints
-file_analyzer_system_prompt = """You are a Static Code Analysis Engine. Extract function boundaries and internal dependency graphs by resolving variable types.
+JSON_SCHEMA = """JSON SCHEMA:
+{"file_path": "str", "content": [{"type": "function", "name": "str", "origin": "str | 'Global'", "dependencies": [{"dependency_origin": "str", "dependency_name": "str", "dependency_type": "class-method | stand-alone"}]}]}"""
+
+BASE_CONSTRAINTS = """You are a Static Code Analysis Engine. Extract function boundaries and internal dependency graphs by resolving variable types.
 
 ABSOLUTE RULES:
 1. Use ONLY the provided source code. Do NOT invent, assume, or hallucinate any function names, class names, paths, or dependencies not in the code.
 2. If uncertain about a dependency or type, omit it rather than guess.
 3. Output ONLY raw JSON — no markdown, no explanations.
 4. Always include "dependencies" array (empty [] if none).
-5. If a method is NOT an API endpoint, set "is_api_method" to null.
-6. Output must have top-level "file_path" and "content" array. Every component is an object inside "content".
+5. Output must have top-level "file_path" and "content" array. Every component is an object inside "content".
 
 JSON SCHEMA:
-{"file_path": "str", "content": [{"type": "class | function | schema | interface | dto", "name": "str", "start_line": int, "end_line": int, "is_api_method": {"method_type": "str", "path": "str"} | null, "dependencies": [{"dependency_origin": "str", "dependency_name": "str", "dependency_type": "class-method | stand-alone"}]}]}
+{"file_path": "str", "content": [{"type": "class | function | schema | interface | dto", "name": "str", "origin": "str | 'Global'", "dependencies": [{"dependency_origin": "str", "dependency_name": "str", "dependency_type": "class-method | stand-alone"}]}]}
 
 EXTRACTION RULES:
 - Extract EVERY method separately — never collapse a Controller/Service into one block.
-- API endpoint: ONLY if decorated with HTTP verb (@Get, @Post, @Put, @Delete, @Patch). Multiple decorators still count if one is an HTTP verb.
-- NEVER mark a Class, @Module, or @Controller as an endpoint. Only METHODS inside are endpoints.
-- Base Path: from class-level decorator like @Controller('users'). Combine: @Controller('auth') + @Post('signup') → /auth/signup.
+- Extract `origin` for each item in content. If a method/function has no parent class, set `origin` to "Global".
 - Dependencies: include BOTH actual method calls AND type references used as parameter types or return types (DTOs, interfaces, custom types).
   - Method calls: dependency_type = "class-method" or "stand-alone"
-  - Type annotations (e.g. PaginationQueryDto, PaginatedResponseDto<Game>): dependency_type = "type-reference", dependency_origin = the type name itself, dependency_name = the type name.
-- IGNORE: imports, enums, property access, loggers, DB drivers, external libraries, test blocks, built-in types (string, number, boolean, void, Promise).
+  - ALL type references & return types (e.g., `Promise<TopPlayerStatDto[]>`, `Throw[]`, `Array<Game>` -> MUST extract just the base type `TopPlayerStatDto`, `Throw`, `Game` without brackets!): Set `dependency_origin = "GLOBAL"` and `dependency_name` strictly to the clean base type name. Set `dependency_type` to "return_type" or "type-reference". Do NOT output `[]` or `<>` inside dependency_name.
+- IGNORE: imports, enums, property access, loggers, DB drivers, external libraries, test blocks, built-in types (string, number, boolean, void, Promise, Array).
 - `this.method()` → dependency_origin is the ENCLOSING CLASS name, dependency_name is `method`.
 - `this.service.doSomething()` → dependency_origin is the class name of `service` (look at constructor), dependency_name is `doSomething`. Do NOT use `service` as the dependency_name."""
 
-# User prompt: dynamic data
+
+default_analyzer_system_prompt = f"""{BASE_CONSTRAINTS}
+
+TYPESCRIPT/NODE.JS GUIDELINES:
+- Extract ALL methods/functions in the file.
+- Dependencies: Track internal method calls (e.g., `this.userService.findByEmail`) as "class-method" dependencies.
+- Resolve constructor injections to their Type names (e.g., `constructor(private readonly test:PlayerService)` means `this.test` refers to `PlayerService`).
+- Do NOT include framework calls (NestJS decorators, Express middleware, etc.) as dependencies.
+Example:
+    constructor(private readonly test:PlayerService);
+
+    public async getTopPlayers(limit: number): Promise<PlayerDto[]> 
+         return this.test.getTopPlayers(limit);
+    
+    output:
+        dependency_origin: "PlayerService" // not test
+        dependency_name: "getTopPlayers"
+        dependency_type: "class-method"
+
+{JSON_SCHEMA}"""
+
+c_sharp_analyzer_system_prompt = f"""{BASE_CONSTRAINTS}
+
+C# / .NET GUIDELINES:
+- Extract ALL methods/functions in the file.
+- Dependencies: Track internal method calls (e.g., `_mediator.Send`, `_authService.GetAllAuthInfo`) as "class-method" dependencies.
+- Resolve injected fields to their Type names (e.g., `private readonly IAuthService _authService` means `_authService` refers to `IAuthService`).
+- Do NOT include .NET framework calls, LINQ, EF Core methods, or NuGet package methods as dependencies.
+
+{JSON_SCHEMA}"""
+
+java_analyzer_system_prompt = f"""{BASE_CONSTRAINTS}
+
+JAVA / SPRING BOOT GUIDELINES:
+- Extract ALL methods/functions in the file.
+- Dependencies: Track internal method calls as "class-method" dependencies.
+- Resolve injected fields to their Type names (e.g., `@Autowired private UserService userService` means `userService` refers to `UserService`).
+- Do NOT include Spring framework calls, JPA/Hibernate methods, or Maven dependency methods as dependencies.
+
+{JSON_SCHEMA}"""
+
 file_analyzer_user_prompt = Template("""Path: $query_data_file_path
+Analyze ALL methods/functions in this file. Use the full file context (imports, constructors, fields) to accurately resolve dependency origins to their EXACT class Type names.
+
 Content:
 $query_data_file_content""")
+
+def get_file_analyzer_system_prompt(language: str) -> str:
+    lang = str(language).lower().strip()
+    
+    if lang in ["c#", "c_sharp", "csharp"]:
+        return c_sharp_analyzer_system_prompt
+    elif lang == "java":
+        return java_analyzer_system_prompt
+    else:
+        return default_analyzer_system_prompt
