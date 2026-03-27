@@ -30,6 +30,23 @@ class _ControllerQueryExtractor(BaseASTExtractor):
             f"{language_name}.scm",
         )
 
+    def _resolve_method_name(self, captures: Dict[str, Any], code_bytes: bytes) -> Optional[str]:
+        # 1. Try to get explicit method name (NestJS, Spring, etc.)
+        method_name = self._get_capture_text(captures, "method_name", code_bytes)
+        if method_name:
+            return method_name
+
+        # 2. Fallback for anonymous routes (Express, Flask, Fiber, etc.)
+        raw_dec = self._get_capture_text(captures, "decorator_type", code_bytes, "")
+        dec_path = self._get_capture_text(captures, "decorator_path", code_bytes, "").strip("'\"")
+        
+        if raw_dec and dec_path:
+            clean_path = dec_path.replace("/", "_").replace(":", "").replace("-", "_").replace("{", "").replace("}", "")
+            method_name = f"{raw_dec.lower()}_{clean_path}".strip("_")
+            return method_name if method_name else f"{raw_dec.lower()}_handler"
+
+        return None
+
     def extract(self, file_path: str, file_metadata: Optional[Dict[str, Any]] = None) -> List[ASTOutputRecord]:
         query = self._load_query(self.query_path)
         tree, code_bytes = self.parse_file(file_path)
@@ -46,8 +63,9 @@ class _ControllerQueryExtractor(BaseASTExtractor):
             class_name = self._get_capture_text(captures, "class_name", code_bytes, "Global")
             base_path = self._get_capture_text(captures, "class_decorator_path", code_bytes, "").strip("'\"") or "/"
 
-            method_name = self._get_capture_text(captures, "method_name", code_bytes)
             method_def = self._get_capture_text(captures, "method_definition", code_bytes)
+            method_name = self._resolve_method_name(captures, code_bytes)
+
             if not method_name or not method_def:
                 continue
 
