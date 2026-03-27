@@ -105,35 +105,60 @@ graph TD
     
     %% Stop
     SFF{{"Stop for this file!"}}
-
-    %% Input Sources
-    Input1(["Local Codebase Folder"])
-    Input2(["GitHub Repo URL"])
-
-    SH["Source Handler"]
     
-    %% Processing
-    FH("File Hasher")
-    SQLL[("Simple SQL DATABASE")]
-    DS[("Vectorization Weaviate Storage")]
-    EGM["Endpoint Graph Manager"]
-    FA["File Analyzer"]
-    EGR["Endpoint Documentation Generator"]
-    DM["Documentation Merger"]
+    %% Notes
+
+
+
+  %% Input Sources
+    subgraph IngestionPipeline ["Ingestion Pipeline"]
+        Input1(["Local Codebase Folder"])
+        Input2(["GitHub Repo URL"])
+        SH["Source Handler"]
+        FH("File Hasher")
+        SQLH[("SQLLite Table for saving Hashes")]
+
+    end
+
+    %% Abstract Syntax Tree Components
+    subgraph ASTComponents ["Abstract Syntax Trees Based Componenet (Serial)"]
+        CE("Controllers Extractor")
+        CS("General AST CodeSplitter")
+    end
+
+    subgraph AnalysisPipeline ["Analysis/Chunking Pipeline (Parallel)"]
+        ASTComponents
+        FA["File Analyzer"]
+        DS[("Centralized Weaviate **Code** Storage")]
+
+        
+    end
+    
+    %% --- HERE IS THE NEW SUBGRAPH ---
+    subgraph DocPipeline ["Documentation Pipeline"]
+        EGM["Endpoint Graph Manager"]
+        SQLG[("SQLLite for saving Graphs")]
+
+        EGR["Endpoint Documentation Generator"]
+        DM["Documentation Merger"]
+        DSV[("Centralized Weaviate **Docs Vectorized** Storage")]
+
+    end
+    %% --------------------------------
 
     Output("Documentation as Json Output")
 
     %% ==========================================
     %% 1. PRIMARY DOWNWARD FLOW 
-    %% (Defining this first forces a clean vertical hierarchy)
     %% ==========================================
     Input1 --> SH
     Input2 --> SH
     SH --> FH
-    FH -- Compare with Key/Value Store --> SQLL
-    SQLL --> HE
-    HE -- NO --> FA
-    FA -- Update Graph and Indicate changes for each endpoint --> EGM
+    CE --> CS
+    FH -- Compare with Key/Value Store --> SQLH
+    IngestionPipeline -- Read From Hashes Table --> HE
+    HE -- NO --> AnalysisPipeline
+    AnalysisPipeline -- Update Graph and Indicate changes for each endpoint --> EGM
     EGM --> EGR
     EGR --> DM
     DM --> Output
@@ -143,42 +168,34 @@ graph TD
     %% ==========================================
     HE -- Yes --> SFF
     FA -- Save Code chunks --> DS
-    DS --> EGR
+    ASTComponents -- Save Code chunks --> DS
+
+
+
+    DSV --> EGR
 
     %% ==========================================
     %% 3. LOOPBACKS (Extended Links)
-    %% (Using ---> prevents the layout from tangling)
     %% ==========================================
-    EGR -- Save documentation info (vectorized) ---> DS
-    EGM -- Save Graphs ---> SQLL
-
+    EGR -- Save documentation info (vectorized) ---> DSV
+    EGM -- Save Graphs ---> SQLG
+    
     %% ==========================================
     %% STYLES
     %% ==========================================
-    %% Inputs: Deep Navy/Slate
     style Input1 fill:#2c3e50,stroke:#5dade2,stroke-width:2px,color:#fff
     style Input2 fill:#2c3e50,stroke:#5dade2,stroke-width:2px,color:#fff
     style SH     fill:#34495e,stroke:#5dade2,stroke-width:1px,color:#fff
-
-    %% Logic/Analyzers: Sage/Forest
     style FA     fill:#2d5a27,stroke:#a9dfbf,stroke-width:1px,color:#fff
-
-    %% Decisions: Muted Amber/Gold
     style HE     fill:#7d6608,stroke:#f1c40f,stroke-width:2px,color:#fff
-
-    %% Processing/Management: Deep Purple/Indigo
     style FH     fill:#4a235a,stroke:#a569bd,stroke-width:1px,color:#fff
     style EGM    fill:#4a235a,stroke:#a569bd,stroke-width:1px,color:#fff
     style EGR    fill:#4a235a,stroke:#a569bd,stroke-width:1px,color:#fff
     style DM     fill:#4a235a,stroke:#a569bd,stroke-width:1px,color:#fff
-
-    %% Storage: Dark Navy
-    style SQLL   fill:#1b2631,stroke:#5dade2,stroke-width:2px,color:#fff
+    style DSV     fill:#1b2631,stroke:#5dade2,stroke-width:2px,color:#fff
     style DS     fill:#1b2631,stroke:#5dade2,stroke-width:2px,color:#fff
-
-    %% Errors & Stops: Muted Crimson
     style SFF    fill:#641e16,stroke:#ec7063,stroke-width:2px,color:#fff
-
-    %% Outputs: Deep Teal
     style Output fill:#0e6251,stroke:#1abc9c,stroke-width:2px,color:#fff
+    %% Style for the Subgraph itself
+    style DocPipeline fill:#17202a,stroke:#7f8c8d,stroke-width:2px,stroke-dasharray: 5 5,color:#fff
 ```
