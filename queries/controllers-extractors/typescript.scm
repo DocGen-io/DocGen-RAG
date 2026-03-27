@@ -126,24 +126,23 @@
 
 
 
-
 ;; ========================================================================
-;; EXPRESS JS CONTROLLER / ROUTER IMPLEMENTATION
+;; EXPRESS JS CONTROLLER / ROUTER IMPLEMENTATION (MAPPED TO NEST JS TAGS)
 ;; ========================================================================
 
 ;; 1. STANDARD ROUTING (e.g., router.post('/path', handler))
 (call_expression
   function: (member_expression
-    object: [(identifier) (member_expression)]
-    property: (property_identifier) @http_method
-    (#match? @http_method "^(get|post|put|delete|patch|options|head|all)$")
+    object: [(identifier) (member_expression)] @class_name
+    property: (property_identifier) @decorator_type
+    (#match? @decorator_type "^(get|post|put|delete|patch|options|head|all)$")
   )
   arguments: (arguments
-    [(string) (template_string)] @route_path
+    [(string) (template_string)] @decorator_path
     (_)*
-    [(arrow_function) (function_expression) (identifier) (member_expression)] @route_handler
+    [(arrow_function) (function_expression) (identifier) (member_expression)] @method_definition
   )
-) @route_definition
+) @class_node
 
 ;; ========================================================================
 ;; 2. CHAINED ROUTING (router.route('/path').get().put().patch().delete())
@@ -153,44 +152,44 @@
 ;; --- DEPTH 1 ---
 (call_expression
   function: (member_expression
-    object: (call_expression function: (member_expression property: (property_identifier) @r1 (#eq? @r1 "route")) arguments: (arguments [(string) (template_string)] @route_path))
-    property: (property_identifier) @http_method (#match? @http_method "^(get|post|put|delete|patch|options|head|all)$")
+    object: (call_expression function: (member_expression property: (property_identifier) @class_decorator_type (#eq? @class_decorator_type "route")) arguments: (arguments [(string) (template_string)] @class_decorator_path))
+    property: (property_identifier) @decorator_type (#match? @decorator_type "^(get|post|put|delete|patch|options|head|all)$")
   )
-  arguments: (arguments (_)* [(arrow_function) (function_expression) (identifier) (member_expression)] @route_handler)
-) @route_definition
+  arguments: (arguments (_)* [(arrow_function) (function_expression) (identifier) (member_expression)] @method_definition)
+) @class_node
 
 ;; --- DEPTH 2 ---
 (call_expression
   function: (member_expression
-    object: (call_expression function: (member_expression object: (call_expression function: (member_expression property: (property_identifier) @r2 (#eq? @r2 "route")) arguments: (arguments [(string) (template_string)] @route_path))))
-    property: (property_identifier) @http_method (#match? @http_method "^(get|post|put|delete|patch|options|head|all)$")
+    object: (call_expression function: (member_expression object: (call_expression function: (member_expression property: (property_identifier) @class_decorator_type (#eq? @class_decorator_type "route")) arguments: (arguments [(string) (template_string)] @class_decorator_path))))
+    property: (property_identifier) @decorator_type (#match? @decorator_type "^(get|post|put|delete|patch|options|head|all)$")
   )
-  arguments: (arguments (_)* [(arrow_function) (function_expression) (identifier) (member_expression)] @route_handler)
-) @route_definition
+  arguments: (arguments (_)* [(arrow_function) (function_expression) (identifier) (member_expression)] @method_definition)
+) @class_node
 
 ;; --- DEPTH 3 ---
 (call_expression
   function: (member_expression
-    object: (call_expression function: (member_expression object: (call_expression function: (member_expression object: (call_expression function: (member_expression property: (property_identifier) @r3 (#eq? @r3 "route")) arguments: (arguments [(string) (template_string)] @route_path))))))
-    property: (property_identifier) @http_method (#match? @http_method "^(get|post|put|delete|patch|options|head|all)$")
+    object: (call_expression function: (member_expression object: (call_expression function: (member_expression object: (call_expression function: (member_expression property: (property_identifier) @class_decorator_type (#eq? @class_decorator_type "route")) arguments: (arguments [(string) (template_string)] @class_decorator_path))))))
+    property: (property_identifier) @decorator_type (#match? @decorator_type "^(get|post|put|delete|patch|options|head|all)$")
   )
-  arguments: (arguments (_)* [(arrow_function) (function_expression) (identifier) (member_expression)] @route_handler)
-) @route_definition
+  arguments: (arguments (_)* [(arrow_function) (function_expression) (identifier) (member_expression)] @method_definition)
+) @class_node
 
-;; --- DEPTH 4 (Captures the .delete in your example) ---
+;; --- DEPTH 4 ---
 (call_expression
   function: (member_expression
-    object: (call_expression function: (member_expression object: (call_expression function: (member_expression object: (call_expression function: (member_expression object: (call_expression function: (member_expression property: (property_identifier) @r4 (#eq? @r4 "route")) arguments: (arguments [(string) (template_string)] @route_path))))))))
-    property: (property_identifier) @http_method (#match? @http_method "^(get|post|put|delete|patch|options|head|all)$")
+    object: (call_expression function: (member_expression object: (call_expression function: (member_expression object: (call_expression function: (member_expression object: (call_expression function: (member_expression property: (property_identifier) @class_decorator_type (#eq? @class_decorator_type "route")) arguments: (arguments [(string) (template_string)] @class_decorator_path))))))))
+    property: (property_identifier) @decorator_type (#match? @decorator_type "^(get|post|put|delete|patch|options|head|all)$")
   )
-  arguments: (arguments (_)* [(arrow_function) (function_expression) (identifier) (member_expression)] @route_handler)
-) @route_definition
+  arguments: (arguments (_)* [(arrow_function) (function_expression) (identifier) (member_expression)] @method_definition)
+) @class_node
 
 ;; --- DEPTH 5 ---
 (call_expression
   function: (member_expression
-    object: (call_expression function: (member_expression object: (call_expression function: (member_expression object: (call_expression function: (member_expression object: (call_expression function: (member_expression object: (call_expression function: (member_expression property: (property_identifier) @r5 (#eq? @r5 "route")) arguments: (arguments [(string) (template_string)] @route_path))))))))))
-    property: (property_identifier) @http_method (#match? @http_method "^(get|post|put|delete|patch|options|head|all)$")
+    object: (call_expression function: (member_expression object: (call_expression function: (member_expression object: (call_expression function: (member_expression object: (call_expression function: (member_expression object: (call_expression function: (member_expression property: (property_identifier) @class_decorator_type (#eq? @class_decorator_type "route")) arguments: (arguments [(string) (template_string)] @class_decorator_path))))))))))
+    property: (property_identifier) @decorator_type (#match? @decorator_type "^(get|post|put|delete|patch|options|head|all)$")
   )
-  arguments: (arguments (_)* [(arrow_function) (function_expression) (identifier) (member_expression)] @route_handler)
-) @route_definition
+  arguments: (arguments (_)* [(arrow_function) (function_expression) (identifier) (member_expression)] @method_definition)
+) @class_node
