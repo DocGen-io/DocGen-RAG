@@ -1,5 +1,5 @@
-from openapi_schema_validator import validate
-from jsonschema.exceptions import ValidationError
+from openapi_spec_validator import validate
+from openapi_spec_validator.validation.exceptions import OpenAPIValidationError
 from src.utils.logger import DocGenLogger
 
 logger = DocGenLogger(__name__)
@@ -12,7 +12,7 @@ def evaluate_structural_validity(generated_swagger_dict: dict) -> bool:
     try:
         validate(generated_swagger_dict)
         return True
-    except ValidationError as e:
+    except OpenAPIValidationError as e:
         logger.warning(f"Swagger structurally invalid: {e.message}")
         return False
     except Exception as e:
