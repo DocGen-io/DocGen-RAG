@@ -1,0 +1,17 @@
+model,language,framework,repo_url,success,execution_time_seconds,valid_openapi,files_processed,error,expected_paths_count,generated_paths_count,path_match_count,path_recall,path_precision,expected_methods_count,generated_methods_count,method_match_count,method_recall,method_precision
+llama3,typescript,Express & Firestore,https://github.com/marcusmonteirodesouza/typescript-firestore-terraform-realworld-backend,True,111.66,True,27,,12.0,12.0,11.0,0.9167,0.9167,19.0,18.0,17.0,0.8947,0.9444
+llama3,typescript,Express + Knex.js + AWS Lambda,https://github.com/kenyipp/realworld-nodejs-example-app,True,191.15,True,145,,12.0,6.0,0.0,0.0,0.0,19.0,6.0,0.0,0.0,0.0
+llama3,typescript,Express + PostgreSQL + Drizzle + Docker,https://github.com/AhmedFawzy31/realworld-express-postgresql-drizzle,True,147.11,True,43,,12.0,10.0,2.0,0.1667,0.2,19.0,14.0,3.0,0.1579,0.2143
+llama3,typescript,Neo4j + NestJS,https://github.com/neo4j-examples/nestjs-neo4j-realworld-example,True,163.94,True,31,,12.0,9.0,8.0,0.6667,0.8889,19.0,12.0,11.0,0.5789,0.9167
+llama3,typescript,NestJS + MikroORM,https://github.com/mikro-orm/nestjs-realworld-example-app,True,178.54,True,37,,12.0,10.0,8.0,0.6667,0.8,19.0,15.0,13.0,0.6842,0.8667
+llama3,typescript,NestJS + TypeORM,https://github.com/lujakob/nestjs-realworld-example-app,True,180.33,True,35,,12.0,11.0,9.0,0.75,0.8182,19.0,15.0,13.0,0.6842,0.8667
+llama3,typescript,Nitro + Prisma + Zod,https://github.com/realworld-apps/nitro-prisma-zod-realworld-example-app,False,43.61,False,43,Pipeline completed but swagger.json not found at output/nitro-prisma-zod-realworld-example-app/swagger.json,,,,,,,,,,
+llama3,Java,Spring Boot + MyBatis,https://github.com/joyheros/realworld,True,277.37,True,83,,12.0,11.0,0.0,0.0,0.0,19.0,16.0,0.0,0.0,0.0
+llama3,Java,Spring Boot + Spring Data JDBC,https://github.com/alexey-lapin/realworld-backend-spring,False,195.29,False,174,Pipeline completed but swagger.json not found at output/realworld-backend-spring/swagger.json,,,,,,,,,,
+llama3,Java,Spring Boot + Spring Data JPA + DDD,https://github.com/borovikovd/realworld-backend-spring-ddd,False,81.95,False,36,Pipeline completed but swagger.json not found at output/realworld-backend-spring-ddd/swagger.json,,,,,,,,,,
+llama3,Java,Spring Boot + Spring Data JPA + PostgreSQL,https://github.com/marcusmonteirodesouza/realworld-backend-spring-boot-java-keycloak-postgresql,True,162.54,True,45,,12.0,9.0,9.0,0.75,1.0,19.0,15.0,15.0,0.7895,1.0
+llama3,Java,Spring Boot + WebFlux + MongoDB,https://github.com/a-mountain/realworld-spring-webflux,True,244.97,True,66,,12.0,15.0,0.0,0.0,0.0,19.0,22.0,0.0,0.0,0.0
+llama3,C#,.NET + Minimal API,https://github.com/Erikvdv/realworldapiminimal,False,93.32,False,42,Pipeline completed but swagger.json not found at output/realworldapiminimal/swagger.json,,,,,,,,,,
+llama3,C#,ASP.NET Core,https://github.com/gothinkster/aspnetcore-realworld-example-app,False,84.81,False,64,Pipeline completed but swagger.json not found at output/aspnetcore-realworld-example-app/swagger.json,,,,,,,,,,
+llama3,C#,ASP.NET Core + Couchbase,https://github.com/mgroves/realworld-aspnet-couchbase,True,239.58,True,130,,12.0,6.0,0.0,0.0,0.0,19.0,6.0,0.0,0.0,0.0
+llama3,C#,ASP.NET Core + Microservices,https://github.com/profjordanov/realworld-microservices,True,97.53,True,73,,12.0,1.0,0.0,0.0,0.0,19.0,1.0,0.0,0.0,0.0

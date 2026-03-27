@@ -1,0 +1,6 @@
+model,language,framework,repo_url,success,execution_time_seconds,valid_openapi,files_processed,error,expected_paths_count,generated_paths_count,path_match_count,path_recall,path_precision,expected_methods_count,generated_methods_count,method_match_count,method_recall,method_precision
+llama3,typescript,Express & Firestore,https://github.com/marcusmonteirodesouza/typescript-firestore-terraform-realworld-backend,True,427.15,True,27,,12,12,11,0.9167,0.9167,19,18,17,0.8947,0.9444
+llama3,typescript,Express + Knex.js + AWS Lambda,https://github.com/kenyipp/realworld-nodejs-example-app,True,641.39,True,145,,12,7,0,0.0,0.0,19,7,0,0.0,0.0
+llama3,typescript,Express + PostgreSQL + Drizzle + Docker,https://github.com/AhmedFawzy31/realworld-express-postgresql-drizzle,True,537.66,False,43,,12,11,3,0.25,0.2727,19,15,4,0.2105,0.2667
+llama3,typescript,Neo4j + NestJS,https://github.com/neo4j-examples/nestjs-neo4j-realworld-example,True,601.79,True,31,,12,9,8,0.6667,0.8889,19,12,11,0.5789,0.9167
+llama3,typescript,NestJS + MikroORM,https://github.com/mikro-orm/nestjs-realworld-example-app,True,786.74,False,37,,12,11,10,0.8333,0.9091,19,16,15,0.7895,0.9375

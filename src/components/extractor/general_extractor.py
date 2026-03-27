@@ -63,26 +63,23 @@ class GeneralExtractor(BaseASTExtractor):
 
                 name = self._get_capture_text(captures, tag, code_bytes)
 
-                # Find the body/declaration node to anchor this container
-                body_node = captures.get(
-                    tag.replace("_name", "_body"),
-                    captures.get(tag.replace("_name", "_declaration"),
-                    captures.get(tag.replace("_name", "_node"),
-                    captures.get(tag.replace("_name", "_definition"),
-                    captures.get(tag, [None]))))
-                )[0]
+                # Anchor on the declaration node (the direct parent of the
+                # captured name identifier). In every tree-sitter grammar the
+                # name identifier is a direct child of its declaration node
+                # (e.g. type_identifier → class_declaration), so
+                # name_node.parent sits on the same path that
+                # _find_parent_container traverses upward from method nodes.
+                name_node = captures[tag][0]
+                anchor_node = name_node.parent
 
-
-                
-                if not body_node or body_node.id in structure_map:
+                if not anchor_node or anchor_node.id in structure_map:
                     continue
 
                 base_path = ""
                 if "class_decorator_path" in captures:
                     base_path = self._get_capture_text(captures, "class_decorator_path", code_bytes).strip("'\"")
 
-
-                structure_map[body_node.id] = {
+                structure_map[anchor_node.id] = {
                     "class_name": name,
                     "base_path": base_path,
                     "methods": [],

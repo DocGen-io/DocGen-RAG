@@ -28,7 +28,8 @@ generators:
   ollama:
     url: "http://127.0.0.1:11434"
     api_key: ""
-    model: "llama3"
+    model: "qwen3.5:4b"
+    # model: "llama3"
   gemini:
     url: "https://generativelanguage.googleapis.com/v1beta/"
     api_key: ""
