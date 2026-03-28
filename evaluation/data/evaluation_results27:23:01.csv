@@ -1,0 +1,12 @@
+model,language,framework,repo_url,success,execution_time_seconds,valid_openapi,files_processed,error,expected_paths_count,generated_paths_count,path_match_count,path_recall,path_precision,expected_methods_count,generated_methods_count,method_match_count,method_recall,method_precision
+llama3,typescript,Express & Firestore,https://github.com/marcusmonteirodesouza/typescript-firestore-terraform-realworld-backend,True,633.51,True,27,,12,12,11,0.9167,0.9167,19,18,17,0.8947,0.9444
+llama3,typescript,Express + Knex.js + AWS Lambda,https://github.com/kenyipp/realworld-nodejs-example-app,True,923.25,True,145,,12,7,0,0.0,0.0,19,7,0,0.0,0.0
+llama3,typescript,Express + PostgreSQL + Drizzle + Docker,https://github.com/AhmedFawzy31/realworld-express-postgresql-drizzle,True,729.59,False,43,,12,11,3,0.25,0.2727,19,15,4,0.2105,0.2667
+llama3,typescript,Neo4j + NestJS,https://github.com/neo4j-examples/nestjs-neo4j-realworld-example,True,888.07,True,31,,12,9,8,0.6667,0.8889,19,12,11,0.5789,0.9167
+llama3,typescript,NestJS + MikroORM,https://github.com/mikro-orm/nestjs-realworld-example-app,True,876.87,False,37,,12,11,10,0.8333,0.9091,19,16,15,0.7895,0.9375
+llama3,typescript,NestJS + TypeORM,https://github.com/lujakob/nestjs-realworld-example-app,True,925.23,False,35,,12,11,10,0.8333,0.9091,19,16,15,0.7895,0.9375
+llama3,Java,Spring Boot + MyBatis,https://github.com/joyheros/realworld,True,1318.52,False,83,,12,12,0,0.0,0.0,19,19,0,0.0,0.0
+llama3,Java,Spring Boot + Spring Data JPA + PostgreSQL,https://github.com/marcusmonteirodesouza/realworld-backend-spring-boot-java-keycloak-postgresql,True,969.23,False,45,,12,9,9,0.75,1.0,19,15,15,0.7895,1.0
+llama3,Java,Spring Boot + WebFlux + MongoDB,https://github.com/a-mountain/realworld-spring-webflux,True,1184.43,False,66,,12,16,0,0.0,0.0,19,23,0,0.0,0.0
+llama3,C#,ASP.NET Core + Couchbase,https://github.com/mgroves/realworld-aspnet-couchbase,True,1140.26,True,130,,12,8,0,0.0,0.0,19,8,0,0.0,0.0
+llama3,C#,ASP.NET Core + Microservices,https://github.com/profjordanov/realworld-microservices,True,471.14,True,73,,12,1,0,0.0,0.0,19,1,0,0.0,0.0
