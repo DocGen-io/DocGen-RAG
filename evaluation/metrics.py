@@ -1,7 +1,7 @@
 from openapi_spec_validator import validate
 from openapi_spec_validator.validation.exceptions import OpenAPIValidationError
 from src.utils.logger import DocGenLogger
-
+from datetime import datetime
 logger = DocGenLogger(__name__)
 
 def evaluate_structural_validity(generated_swagger_dict: dict) -> bool:
@@ -84,7 +84,8 @@ def evaluate_accuracy(generated_swagger: dict, ground_truth_swagger: dict) -> di
         "generated_methods_count": len(gen_methods_set),
         "method_match_count": len(method_intersection),
         "method_recall": round(method_recall, 4),
-        "method_precision": round(method_precision, 4)
+        "method_precision": round(method_precision, 4),
+        "date": datetime.now().strftime("%d:%H:%M")
     }
 
 def print_metrics_report(metrics: dict):

@@ -5,7 +5,6 @@ import requests
 import pandas as pd
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, asdict
-from datetime import datetime
 from src.pipelines.documentation_pipeline import DocumentationPipeline
 from evaluation.metrics import evaluate_structural_validity, evaluate_accuracy
 from src.utils.logger import DocGenLogger
@@ -19,10 +18,17 @@ logger = DocGenLogger(__name__)
 class EvaluationOrchestrator:
     """Coordinates reading repositories, running the evaluation, and writing results"""
     
-    def __init__(self, repositories_file: str, output_file: str, model_name: str):
+    def __init__(self, repositories_file: str, output_file: str, model_name: str, description: str = ""):
         self.repositories_file = repositories_file
         self.output_file = output_file
         self.ground_truth_manager = GroundTruthManager()
+        self.description = description
+        
+        # Load historical results ONCE so we don't exponentially duplicate rows during save_results
+        if os.path.exists(self.output_file):
+            self.historical_df = pd.read_csv(self.output_file)
+        else:
+            self.historical_df = None
         self.evaluator = RepositoryEvaluator(
             pipeline=DocumentationPipeline(config_path="config.yaml"), 
             model_name=model_name
@@ -36,6 +42,12 @@ class EvaluationOrchestrator:
     def save_results(self):
         records = [asdict(r) for r in self.results]
         df = pd.DataFrame(records)
+        if self.description:
+            df["description"] = self.description
+            
+        if self.historical_df is not None:
+            df = pd.concat([self.historical_df, df], ignore_index=True)
+            
         df.to_csv(self.output_file, index=False)
         logger.info(f"Progress iteratively saved to {self.output_file}", location="EvaluationOrchestrator.save_results")
 
@@ -70,13 +82,15 @@ def main():
     parser = argparse.ArgumentParser(description="Run automated thesis evaluation harness")
     parser.add_argument("--model", type=str, default="llama3", help="Name of the model being evaluated")
     parser.add_argument("--config", type=str, default="evaluation/repositories.json", help="Path to repositories JSON configuration")
-    parser.add_argument("--output", type=str, default="evaluation/data/evaluation_results", help="Output file path for evaluation metrics CSV")
+    parser.add_argument("--output", type=str, default="evaluation/data/evaluation_results.csv", help="Output file path for evaluation metrics CSV")
+    parser.add_argument("--description", type=str, default="", help="Description of the evaluation")
     args = parser.parse_args()
     
     orchestrator = EvaluationOrchestrator(
         repositories_file=args.config,
-        output_file=args.output + datetime.now().strftime("%d:%H:%M") + ".csv",
-        model_name=args.model
+        output_file=args.output,
+        model_name=args.model,
+        description=args.description
     )
     orchestrator.run()
 
