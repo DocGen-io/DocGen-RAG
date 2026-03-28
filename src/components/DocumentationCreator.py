@@ -48,16 +48,21 @@ class DocumentationCreator:
     def _fetch_dependency_context(self, node_ids: List[str]) -> str:
         """Fetch code context from Weaviate for a list of node IDs."""
         if not node_ids:
+            logger.info("No dependency node_ids to fetch")
             return "No internal dependencies identified."
         
         context_parts = []
         for node_id in node_ids:
+            logger.info(f"[WEAVIATE QUERY] fetch_by_node_id('{node_id}')")
             docs = fetch_by_node_id(self.document_store, node_id)
+            logger.info(f"[WEAVIATE RESULT] node_id='{node_id}' -> {len(docs)} doc(s)")
             
             if docs:
                 doc = docs[0]
+                logger.info(f"[WEAVIATE HIT] node_id='{node_id}' content_len={len(doc.content)} meta_keys={list(doc.meta.keys())}")
                 context_parts.append(f"**{node_id}**:\n{doc.content}\n")
             else:
+                logger.warning(f"[WEAVIATE MISS] node_id='{node_id}' -> no documents found")
                 context_parts.append(f"**{node_id}**: No additional context available.\n")
         
         return "\n".join(context_parts) if context_parts else "No dependency context found."
@@ -162,17 +167,15 @@ class DocumentationCreator:
             try:
                 # 1. Gather all internal dependencies (excluding the endpoint itself to save tokens)
                 node_ids = [n for n in graph.get_all_nodes() if n != endpoint_id]
-
-
-                for noed_id in node_ids:
-                    logger.info(f"Found dependency: {noed_id}")
+                logger.info(f"[GRAPH] endpoint={endpoint_id} has {len(node_ids)} dependency node(s): {node_ids}")
 
                 # 2. Fetch context from Weaviate for all nodes
                 dep_context = self._fetch_dependency_context(node_ids)
                 
                 # 3. Extract the endpoint method's details from Weaviate to guide the prompt
+                logger.info(f"[WEAVIATE QUERY] fetch endpoint doc: '{endpoint_id}'")
                 endpoint_doc_list = fetch_by_node_id(self.document_store, endpoint_id)
-                logger.info(f"Found {len(endpoint_doc_list)} doc(s) in Weaviate for {endpoint_id}")
+                logger.info(f"[WEAVIATE RESULT] endpoint='{endpoint_id}' -> {len(endpoint_doc_list)} doc(s)")
 
                 if not endpoint_doc_list:
                     logger.error(f"Endpoint {endpoint_id} not found in Weaviate. Skipping.")

@@ -22,3 +22,5 @@ class EvaluationRecord:
     method_match_count: Optional[int] = None
     method_recall: Optional[float] = None
     method_precision: Optional[float] = None
+    date: Optional[str] = None
+    description: Optional[str] = None

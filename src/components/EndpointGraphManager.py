@@ -184,8 +184,7 @@ class EndpointGraphManager:
             node_id = get_node_id(
                 file_name=original_f_name, 
                 class_name=c_name_val, 
-                method_name=m_name_val, 
-                method_type=record.get('method_type', 'unknown')
+                method_name=m_name_val
             )
             
             ast_by_file_method[(f_name, m_name)] = {
@@ -230,7 +229,7 @@ class EndpointGraphManager:
                     if is_api and isinstance(is_api, dict):
                         method_type = is_api.get("method_type", "unknown")
                         
-                    curr_node_id = get_node_id(original_f_name, origin, item_name, method_type)
+                    curr_node_id = get_node_id(original_f_name, origin, item_name)
 
                 # Register in catalog by (origin, name)
                 item_origin = item.get("origin") or "Global"
@@ -276,8 +275,7 @@ class EndpointGraphManager:
             ep_node_id = get_node_id(
                 file_name=file_name_val, 
                 class_name=ep.get('class_name') or 'Global', 
-                method_name=m_name_val, 
-                method_type=ep.get('method_type', 'unknown')
+                method_name=m_name_val
             )
             
             graph = DependencyGraph(start_node=ep_node_id)

@@ -1,7 +1,7 @@
 from string import Template
 
 JSON_SCHEMA = """JSON SCHEMA:
-{"file_path": "str", "content": [{"type": "function", "name": "str", "origin": "str | 'Global'", "dependencies": [{"dependency_origin": "str", "dependency_name": "str", "dependency_type": "class-method | stand-alone"}]}]}"""
+{"file_path": "str", "content": [{"type": "method | function", "name": "str", "origin": "str (MUST be the class name if it is a method) | 'Global'", "dependencies": [{"dependency_origin": "str", "dependency_name": "str", "dependency_type": "class-method | stand-alone"}]}]}"""
 
 BASE_CONSTRAINTS = """You are a Static Code Analysis Engine. Extract function boundaries and internal dependency graphs by resolving variable types.
 
@@ -13,14 +13,14 @@ ABSOLUTE RULES:
 5. Output must have top-level "file_path" and "content" array. Every component is an object inside "content".
 
 JSON SCHEMA:
-{"file_path": "str", "content": [{"type": "class | function | schema | interface | dto", "name": "str", "origin": "str | 'Global'", "dependencies": [{"dependency_origin": "str", "dependency_name": "str", "dependency_type": "class-method | stand-alone"}]}]}
+{"file_path": "str", "content": [{"type": "method | function", "name": "str", "origin": "str (MUST be the class name if it is a method) | 'Global'", "dependencies": [{"dependency_origin": "str", "dependency_name": "str", "dependency_type": "class-method | stand-alone"}]}]}
 
 EXTRACTION RULES:
-- Extract EVERY method separately — never collapse a Controller/Service into one block.
-- Extract `origin` for each item in content. If a method/function has no parent class, set `origin` to "Global".
+- EXTRACT EVERY METHOD SEPARATELY. NEVER collapse a Controller or Service into a single block. Each method must be its own object in the "content" array.
+- Extract `origin` for each item in content. `origin` MUST be the EXACT name of the enclosing class. If a method/function has no parent class, set `origin` to "Global". Do NOT use file paths for `origin`.
 - Dependencies: include BOTH actual method calls AND type references used as parameter types or return types (DTOs, interfaces, custom types).
   - Method calls: dependency_type = "class-method" or "stand-alone"
-  - ALL type references & return types (e.g., `Promise<TopPlayerStatDto[]>`, `Throw[]`, `Array<Game>` -> MUST extract just the base type `TopPlayerStatDto`, `Throw`, `Game` without brackets!): Set `dependency_origin = "GLOBAL"` and `dependency_name` strictly to the clean base type name. Set `dependency_type` to "return_type" or "type-reference". Do NOT output `[]` or `<>` inside dependency_name.
+  - ALL type references & return types (e.g., `Promise<TopPlayerStatDto[]>`, `Throw[]`, `Array<Game>` -> MUST extract just the base type `TopPlayerStatDto`, `Throw`, `Game` without brackets!): Set `dependency_origin = "Global"` and `dependency_name` strictly to the clean base type name. Set `dependency_type` to "return_type" or "type-reference". Do NOT output `[]` or `<>` inside dependency_name.
 - IGNORE: imports, enums, property access, loggers, DB drivers, external libraries, test blocks, built-in types (string, number, boolean, void, Promise, Array).
 - `this.method()` → dependency_origin is the ENCLOSING CLASS name, dependency_name is `method`.
 - `this.service.doSomething()` → dependency_origin is the class name of `service` (look at constructor), dependency_name is `doSomething`. Do NOT use `service` as the dependency_name."""

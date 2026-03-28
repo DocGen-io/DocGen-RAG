@@ -19,7 +19,7 @@ from src.utils.logger import DocGenLogger
 
 logger = DocGenLogger(__name__)
 
-SUPPORTED_LANGUAGES = {"java", "c_sharp", "c#", "typescript"}
+SUPPORTED_LANGUAGES = {"java", "c_sharp", "typescript"}
 
 
 @component

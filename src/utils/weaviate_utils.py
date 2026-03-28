@@ -46,8 +46,8 @@ def fetch_by_method_name(
         return []
 
 
-def get_node_id(file_name: str,class_name: str, method_name: str="none",method_type:str = "unknown") -> str:
-    return f"{file_name.lower()}:{class_name.lower()}:{method_name.lower()}:{method_type.lower()}"
+def get_node_id(file_name: str, class_name: str, method_name: str="none") -> str:
+    return f"{file_name.lower()}:{class_name.lower()}:{method_name.lower()}"
 
 def fetch_by_class_name(
     document_store: WeaviateDocumentStore,
