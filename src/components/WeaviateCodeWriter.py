@@ -47,7 +47,7 @@ class WeaviateCodeWriter:
         
         documents = []
         for ep in ast_output:
-            node_id = get_node_id(ep.get('file_name'),ep.get('class_name'),ep.get('method_name'),ep.get('method_type'))
+            node_id = get_node_id(ep.get('file_name'),ep.get('class_name'),ep.get('method_name'))
             doc_id = hashlib.sha256(node_id.encode()).hexdigest()
 
             if file_type =='endpoint':

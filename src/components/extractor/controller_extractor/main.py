@@ -87,7 +87,7 @@ class _ControllerQueryExtractor(BaseASTExtractor):
                 "method_type": decorator_type,
                 "method_path": decorator_path,
                 "is_api_route": True,
-                "node_id": get_node_id(file_name,class_name,method_name,decorator_type)
+                "node_id": get_node_id(file_name,class_name,method_name)
             })
 
         # Remove any matched classes that had routes but NO actual HTTP endpoint methods
