@@ -19,6 +19,19 @@ def evaluate_structural_validity(generated_swagger_dict: dict) -> bool:
         logger.warning(f"Validation verification error: {e}")
         return False
 
+def extract_methods(paths: dict) -> set:
+    """
+    Extracts methods from the paths dictionary.
+    Returns a set of methods in the format "METHOD /path".
+    """
+    gen_methods_set = {
+        f"{method.upper()} {path}"
+        for path, methods in paths.items()
+        for method in methods.keys()
+        if method.lower() != "parameters"
+    }
+    return gen_methods_set
+
 def evaluate_accuracy(generated_swagger: dict, ground_truth_swagger: dict) -> dict:
     """
     Compares the generated swagger to the ground truth swagger.
@@ -39,31 +52,27 @@ def evaluate_accuracy(generated_swagger: dict, ground_truth_swagger: dict) -> di
     truth_paths_set = set(truth_paths.keys())
     
     # Path Metrics
-    path_intersection = generated_paths_set.intersection(truth_paths_set)
-    path_recall = len(path_intersection) / len(truth_paths_set) if truth_paths_set else 1.0
-    path_precision = len(path_intersection) / len(generated_paths_set) if generated_paths_set else 1.0
-    
-    # Method Metrics
-    generated_methods = []
-    for path, methods in gen_paths.items():
-        if path in truth_paths_set: # Only count methods if the path itself is a match? Let's count all methods globally.
-            pass
-        for method in methods.keys():
-            if method.lower() != "parameters":
-                generated_methods.append(f"{method.upper()} {path}")
+    path_intersection = {t for t in truth_paths_set if any(g.endswith(t) for g in generated_paths_set)}
+    valid_generated_paths = {g for g in generated_paths_set if any(g.endswith(t) for t in truth_paths_set)}
                 
-    truth_methods = []
-    for path, methods in truth_paths.items():
-        for method in methods.keys():
-            if method.lower() != "parameters":
-                truth_methods.append(f"{method.upper()} {path}")
-            
-    gen_methods_set = set(generated_methods)
-    truth_methods_set = set(truth_methods)
+    path_recall = len(path_intersection) / len(truth_paths_set) if truth_paths_set else 1.0
+    path_precision = len(valid_generated_paths) / len(generated_paths_set) if generated_paths_set else 1.0
     
-    method_intersection = gen_methods_set.intersection(truth_methods_set)
+    # Method Extraction via Set Comprehension
+    gen_methods_set = extract_methods(gen_paths)
+    truth_methods_set = extract_methods(truth_paths)
+    
+    # Method Metrics - Suffix inclusion check via mapping function
+    def is_method_match(t_method: str, g_method: str) -> bool:
+        t_verb, t_path = t_method.split(" ", 1)
+        g_verb, g_path = g_method.split(" ", 1)
+        return t_verb == g_verb and g_path.endswith(t_path)
+        
+    method_intersection = {t for t in truth_methods_set if any(is_method_match(t, g) for g in gen_methods_set)}
+    valid_generated_methods = {g for g in gen_methods_set if any(is_method_match(t, g) for t in truth_methods_set)}
+                
     method_recall = len(method_intersection) / len(truth_methods_set) if truth_methods_set else 1.0
-    method_precision = len(method_intersection) / len(gen_methods_set) if gen_methods_set else 1.0
+    method_precision = len(valid_generated_methods) / len(gen_methods_set) if gen_methods_set else 1.0
     
     return {
         "expected_paths_count": len(truth_paths_set),
