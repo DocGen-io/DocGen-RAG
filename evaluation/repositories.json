@@ -8,10 +8,6 @@
                 "repo_url": "https://github.com/marcusmonteirodesouza/typescript-firestore-terraform-realworld-backend"
             },
             {
-                "uses": "Express + Knex.js + AWS Lambda",
-                "repo_url": "https://github.com/kenyipp/realworld-nodejs-example-app"
-            },
-            {
                 "uses": "Express + PostgreSQL + Drizzle + Docker",
                 "repo_url": "https://github.com/AhmedFawzy31/realworld-express-postgresql-drizzle"
             },
