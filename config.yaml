@@ -3,8 +3,8 @@
 # RAG settings
 rag:
   embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
-  top_k_retriever: 10
-  top_k_reranker: 5
+  top_k_retriever: 2
+  top_k_reranker: 2
   chunk_size: 500
 
 
