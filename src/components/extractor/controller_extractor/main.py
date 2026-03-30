@@ -7,7 +7,7 @@ to precisely identify only REST endpoints (not gRPC, WebSocket, etc.).
 """
 import os
 from haystack import component
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 
 from tree_sitter import QueryCursor
 
@@ -112,13 +112,13 @@ class ControllerExtractor:
 
     @component.output_types(
         endpoints=List[ASTOutputRecord],
-        controller_files=int,
+        controller_files=Set[str],
         total_endpoints=int,
     )
-    def run(self, files: List[Dict[str, str]]) -> Dict[str, Any]:
+    def run(self, files: List[Dict[str, str]],finished:bool=False) -> Dict[str, Any]:
         """Extract REST API endpoints from source files."""
         all_endpoints: List[ASTOutputRecord] = []
-        controller_files = 0
+        controller_files: Set[str] = set()
 
 
         # one per language
@@ -135,11 +135,12 @@ class ControllerExtractor:
                 endpoints = extractors[language].extract(file_path, file_metadata)
                 if endpoints:
                     all_endpoints.extend(endpoints)
-                    controller_files += 1
+                    controller_files.add(file_metadata.get('path',""))
+
             except Exception as e:
                 logger.error(f"Error extracting controllers from {file_path}: {e}")
 
-        logger.info(f"Extracted {len(all_endpoints)} endpoints from {controller_files} controller file(s)")
+        logger.info(f"Extracted {len(all_endpoints)} endpoints from {len(controller_files)} controller file(s)")
 
         return {
             "endpoints": all_endpoints,
