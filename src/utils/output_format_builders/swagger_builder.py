@@ -318,16 +318,19 @@ class SwaggerBuilder(OutputFormatBuilder):
         """Normalize a single Response Object. See: https://swagger.io/specification/#response-object"""
         res = {"description": r.get("description", "Response")}
         if "content" in r:
-            content = {}
-            for mt, obj in r["content"].items():
-                if isinstance(obj, dict):
-                    schema = self._normalize_schema(obj.get("schema", {}))
-                    # Drop content if schema is empty or carries no useful info
-                    if self._is_empty_schema(schema):
-                        continue
-                    content[mt] = {"schema": schema}
-            if content:
-                res["content"] = content
+            if r["content"] is None:
+                logger.error("Response content is null (None), skipping content generation.")
+            else:
+                content = {}
+                for mt, obj in r["content"].items():
+                    if isinstance(obj, dict):
+                        schema = self._normalize_schema(obj.get("schema", {}))
+                        # Drop content if schema is empty or carries no useful info
+                        if self._is_empty_schema(schema):
+                            continue
+                        content[mt] = {"schema": schema}
+                if content:
+                    res["content"] = content
         elif "schema" in r:
             schema = self._normalize_schema(r["schema"])
             if not self._is_empty_schema(schema):
