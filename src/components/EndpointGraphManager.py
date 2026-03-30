@@ -241,7 +241,22 @@ class EndpointGraphManager:
         # Pass B: resolve dependencies using the catalog exclusively
         for curr_node_id, raw_deps in raw_deps_map.items():
             deps = []
+            
+            # Normalize raw_deps to a list in case the LLM returned a dict or string directly
+            if isinstance(raw_deps, dict):
+                raw_deps = [raw_deps]
+            elif isinstance(raw_deps, str):
+                raw_deps = [{"dependency_name": raw_deps, "dependency_origin": "Global"}]
+            elif not isinstance(raw_deps, list):
+                raw_deps = []
+
             for dep in raw_deps:
+                # Normalize the array element if it is a string instead of an object
+                if isinstance(dep, str):
+                    dep = {"dependency_name": dep, "dependency_origin": "Global"}
+                elif not isinstance(dep, dict):
+                    continue
+
                 dep_origin = dep.get("dependency_origin") or "Global"
                 dep_name = dep.get("dependency_name")
                 
@@ -250,6 +265,10 @@ class EndpointGraphManager:
                     
                 dep_type = dep.get("dependency_type")
                 
+                if not isinstance(dep_origin, str) or not isinstance(dep_name, str):
+                    logger.error(f"Skipping dependency due to malformed non-string origin or name: {dep}")
+                    continue
+
                 dep_c_name = dep_origin.lower()
                 dep_m_name = dep_name.lower()
                 
