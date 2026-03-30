@@ -16,6 +16,7 @@ from haystack_integrations.components.retrievers.weaviate import (
     WeaviateEmbeddingRetriever,
     WeaviateBM25Retriever,
 )
+from src.utils.weaviate_utils import get_weaviate_store
 from src.utils.config_loader import load_config
 from src.utils.logger import DocGenLogger
 import argparse
@@ -61,7 +62,6 @@ class QueryPipeline:
         Returns:
             List of endpoint dicts (path, method, summary, content) ordered by relevance.
         """
-        from src.utils.weaviate_utils import get_weaviate_store
 
         with get_weaviate_store(url=self.weaviate_url) as doc_store:
             semantic_retriever = WeaviateEmbeddingRetriever(
@@ -95,7 +95,7 @@ class QueryPipeline:
                     "path": doc.meta.get("path", ""),
                     "method": doc.meta.get("method", ""),
                     "summary": doc.meta.get("summary", ""),
-                    "content": doc.content,
+                    "content": doc.meta.get("raw_json") or doc.content or "Content not found!!",
                     "score": doc.score,
                 })
 
