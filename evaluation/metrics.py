@@ -2,7 +2,11 @@ from openapi_spec_validator import validate
 from openapi_spec_validator.validation.exceptions import OpenAPIValidationError
 from src.utils.logger import DocGenLogger
 from datetime import datetime
+import re
+
 logger = DocGenLogger(__name__)
+
+   
 
 def evaluate_structural_validity(generated_swagger_dict: dict) -> bool:
     """
@@ -43,7 +47,7 @@ def evaluate_accuracy(generated_swagger: dict, ground_truth_swagger: dict) -> di
         p = p.rstrip('/')
         if not p.startswith('/'):
             p = '/' + p
-        return p
+        return re.sub(r"\{.*?\}", "dynamic_param", p)
 
     gen_paths = {normalize_path(k): v for k, v in generated_swagger.get("paths", {}).items()}
     truth_paths = {normalize_path(k): v for k, v in ground_truth_swagger.get("paths", {}).items()}

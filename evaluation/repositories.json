@@ -1,13 +1,20 @@
 [
     {
         "language": "typescript",
-        "api_documentation_url": "https://raw.githubusercontent.com/realworld-apps/realworld/main/specs/api/openapi.yml",
+        "documentation": {
+            "origin": "remote",
+            "path": "https://raw.githubusercontent.com/realworld-apps/realworld/main/specs/api/openapi.yml"
+        },
         "repos": [
             {
                 "uses": "Express & Firestore",
                 "repo_url": "https://github.com/marcusmonteirodesouza/typescript-firestore-terraform-realworld-backend"
             },
             {
+                "documentation": {
+                    "origin": "local",
+                    "path": "express_postgres_drizzle_docker.json"
+                },
                 "uses": "Express + PostgreSQL + Drizzle + Docker",
                 "repo_url": "https://github.com/AhmedFawzy31/realworld-express-postgresql-drizzle"
             },
@@ -16,6 +23,10 @@
                 "repo_url": "https://github.com/neo4j-examples/nestjs-neo4j-realworld-example"
             },
             {
+                "documentation": {
+                    "origin": "local",
+                    "path": "nestjs_microrm.json"
+                },
                 "uses": "NestJS + MikroORM",
                 "repo_url": "https://github.com/mikro-orm/nestjs-realworld-example-app"
             },
@@ -27,9 +38,16 @@
     },
     {
         "language": "Java",
-        "api_documentation_url": "https://raw.githubusercontent.com/realworld-apps/realworld/main/specs/api/openapi.yml",
+        "documentation": {
+            "origin": "remote",
+            "path": "https://raw.githubusercontent.com/realworld-apps/realworld/main/specs/api/openapi.yml"
+        },
         "repos": [
             {
+                "documentation": {
+                    "origin": "local",
+                    "path": "springboot_mybatis_java.json"
+                },
                 "uses": "Spring Boot + MyBatis",
                 "repo_url": "https://github.com/joyheros/realworld"
             },
@@ -45,13 +63,20 @@
     },
     {
         "language": "C#",
-        "api_documentation_url": "https://raw.githubusercontent.com/realworld-apps/realworld/main/specs/api/openapi.yml",
+        "documentation": {
+            "origin": "remote",
+            "path": "https://raw.githubusercontent.com/realworld-apps/realworld/main/specs/api/openapi.yml"
+        },
         "repos": [
             {
                 "uses": "ASP.NET Core + Couchbase",
                 "repo_url": "https://github.com/mgroves/realworld-aspnet-couchbase"
             },
             {
+                "documentation": {
+                    "origin": "local",
+                    "path": "real-world-microservice-c#.json"
+                },
                 "uses": "ASP.NET Core + Microservices",
                 "repo_url": "https://github.com/profjordanov/realworld-microservices"
             }
