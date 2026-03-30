@@ -90,7 +90,7 @@ class WeaviateCodeWriter:
     # Code chunks → Documents  (from ASTCodeSplitter, already Documents)
     # ------------------------------------------------------------------
 
-    @component.output_types(documents_written=int)
+    @component.output_types(documents=List[Document],documents_written=int)
     def run(
         self,
         endpoints: Optional[List[ASTOutputRecord]] = None,
@@ -125,4 +125,4 @@ class WeaviateCodeWriter:
             writer.run(documents=all_documents)
 
         logger.info(f"Successfully wrote {len(all_documents)} documents to Weaviate")
-        return {"documents_written": len(all_documents)}
+        return {"documents":all_documents,"documents_written": len(all_documents)}

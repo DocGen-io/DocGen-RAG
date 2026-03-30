@@ -1,10 +1,3 @@
-"""
-DocumentationCreator - Haystack component for generating REST API documentation.
-
-This component analyzes code_mapper output, fetches dependency information from Weaviate,
-and uses LLM to generate comprehensive API documentation in Swagger formats.
-"""
-
 import os
 import json
 from string import Template
@@ -53,9 +46,7 @@ class DocumentationCreator:
         
         context_parts = []
         for node_id in node_ids:
-            logger.info(f"[WEAVIATE QUERY] fetch_by_node_id('{node_id}')")
             docs = fetch_by_node_id(self.document_store, node_id)
-            logger.info(f"[WEAVIATE RESULT] node_id='{node_id}' -> {len(docs)} doc(s)")
             
             if docs:
                 doc = docs[0]
@@ -67,41 +58,10 @@ class DocumentationCreator:
         
         return "\n".join(context_parts) if context_parts else "No dependency context found."
     
-    def _fetch_type_context(self, code_text: str, dep_context: str) -> str:
-        """Extract PascalCase type names (DTOs/interfaces) from code and fetch their definitions."""
-        import re
-        # Match PascalCase names that look like DTOs/interfaces (2+ capital letters, ending in Dto/Response/Request/etc)
-        type_pattern = re.compile(r'\b([A-Z][a-zA-Z]*(?:Dto|Response|Request|Entity|Model|Interface|Type|Schema))\b')
-        combined_text = f"{code_text}\n{dep_context}"
-        type_names = set(type_pattern.findall(combined_text))
-        
-        if not type_names:
-            return ""
-        
-        type_parts = []
-        fetched = set()
-        for type_name in type_names:
-            if type_name in fetched:
-                continue
-            try:
-                docs = self.document_store.filter_documents(filters={
-                    "field": "meta.name",
-                    "operator": "==",
-                    "value": type_name
-                })
-                if docs:
-                    fetched.add(type_name)
-                    type_parts.append(f"**{type_name}**:\n{docs[0].content}\n")
-            except Exception as e:
-                logger.debug(f"Could not fetch type {type_name}: {e}")
-        
-        return "\n".join(type_parts) if type_parts else ""
     
-    def _build_prompt(self, method: Dict, dependencies_context: str, type_context: str = "") -> List[ChatMessage]:
+    
+    def _build_prompt(self, method: Dict, dependencies_context: str) -> List[ChatMessage]:
         """Build system + user messages for documentation generation."""
-        full_context = dependencies_context
-        if type_context:
-            full_context += f"\n\nType Definitions (DTOs, interfaces, schemas):\n{type_context}"
         
         user_prompt = doc_creator_user_prompt.substitute(
             controller_name=method.get("class_name", "Unknown"),
@@ -110,7 +70,7 @@ class DocumentationCreator:
             endpoint_path=method.get("method_path", "/"),
             base_path=method.get("base_path", "/"),
             method_definition=method.get("method_definition", ""),
-            dependencies_context=full_context
+            dependencies_context=dependencies_context
         )
 
         return [
@@ -118,9 +78,6 @@ class DocumentationCreator:
             ChatMessage.from_user(user_prompt)
         ]
     
-  
-  
-
     @component.output_types(
         methods_processed=int,
         methods_failed=int,
@@ -172,6 +129,7 @@ class DocumentationCreator:
                 # 2. Fetch context from Weaviate for all nodes
                 dep_context = self._fetch_dependency_context(node_ids)
                 
+
                 # 3. Extract the endpoint method's details from Weaviate to guide the prompt
                 logger.info(f"[WEAVIATE QUERY] fetch endpoint doc: '{endpoint_id}'")
                 endpoint_doc_list = fetch_by_node_id(self.document_store, endpoint_id)
@@ -195,8 +153,6 @@ class DocumentationCreator:
 
                 raw_method_type = str(api_details.get("method_type", "unknown"))
                
-                logger.info(f"Processing endpoint {endpoint_id} of type: {raw_method_type}")
-                # Check if this is an internal/RPC method like `grpc_method`
                 if raw_method_type.lower()  not in API_METHODS:
                     logger.info(f"Skipping non-REST method {endpoint_id} of type: {raw_method_type}")
                     # We still count it as 'processed' so it doesn't skew failure metrics, but we don't document it.
@@ -213,11 +169,9 @@ class DocumentationCreator:
                     "method_definition": endpoint_doc.content
                 }
                 
-                # 4. Fetch type definitions (DTOs/interfaces) referenced in the code
-                type_context = self._fetch_type_context(endpoint_doc.content, dep_context)
                 
                 # 5. Build prompt and generate
-                prompt = self._build_prompt(method_info, dep_context, type_context)
+                prompt = self._build_prompt(method_info, dep_context)
                 documentation = LLMJsonHandler.parse_with_retry(generator=self.generator, prompt=prompt,max_retries=3)
                 
                 if documentation:

@@ -16,10 +16,11 @@ from typing import List, Dict, Any, Optional, Set
 from src.components.extractor.general_extractor import GeneralExtractor
 from src.utils.types import ASTOutputRecord
 from src.utils.logger import DocGenLogger
+from src.utils.config_loader import load_config
+ 
 
 logger = DocGenLogger(__name__)
 
-SUPPORTED_LANGUAGES = {"java", "c_sharp", "typescript"}
 
 
 @component
@@ -33,14 +34,14 @@ class ASTCodeSplitter:
     Methods already captured by ControllerExtractor are skipped to avoid duplication.
     """
 
-    def __init__(self):
-        pass
+    def __init__(self,config_path: str = "config.yaml"):
+        self.config = load_config(config_path)
 
     @component.output_types(documents=List[Document])
     def run(
         self,
         files: List[Dict[str, str]],
-        endpoints: Optional[List[ASTOutputRecord]] = None,
+        controller_files: Set[str],
     ) -> Dict[str, List[ASTOutputRecord]]:
         """
         Parse source files via GeneralExtractor and package each method
@@ -48,32 +49,27 @@ class ASTCodeSplitter:
 
         Args:
             files: List of file dicts from FileHasher (path, language, relative_path).
-            endpoints: Optional list of ASTOutputRecord from ControllerExtractor.
-                       Methods matching these node_ids are skipped.
+            controller_files: Set of file paths that are controllers used to skip chunking endpoints again.
 
         Returns:
             documents: List of Document objects with rich metadata for Weaviate.
         """
-        # Build a set of node_ids already captured by ControllerExtractor
-        endpoint_node_ids: Set[str] = set()
-        if endpoints:
-            for ep in endpoints:
-                endpoint_node_ids.add(ep.node_id)
-
-        split_docs: List[Document] = []
+       
 
         for file_meta in files:
             file_path = file_meta.get("path", "")
+            if file_path in controller_files:
+                continue
+
             language = file_meta.get("language", "unknown")
 
-            if language.lower() not in SUPPORTED_LANGUAGES:
+            if language.lower() not in self.config.get("languages", []):
                 continue
 
             try:
                 extractor = GeneralExtractor(language)
                 records: List[ASTOutputRecord] = extractor.extract(file_path, file_meta)
 
-                split_docs.extend([record for record in records if record.node_id not in endpoint_node_ids])
 
             except Exception as e:
                 logger.error(f"GeneralExtractor failed for {file_path}: {e}")
@@ -81,8 +77,8 @@ class ASTCodeSplitter:
 
 
         logger.info(
-            f"ASTCodeSplitter produced {len(split_docs)} chunks from {len(files)} files"
-            + (f" (skipped {len(endpoint_node_ids)} endpoint methods)" if endpoint_node_ids else ""),
+            f"ASTCodeSplitter produced {len(records)} chunks from {len(files)} files"
+            + (f" (skipped {len(controller_files)} controller files)" if controller_files else ""),
             location="ASTCodeSplitter.run",
         )
-        return {"documents": split_docs}
+        return {"documents": records, "finished": True}
