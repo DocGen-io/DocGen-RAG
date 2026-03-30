@@ -31,12 +31,12 @@ class AnalysisPipeline:
         self._build(config_path)
 
     def _build(self, config_path: str):
-        self.pipeline.add_component("controller_extractor", ControllerExtractor())
         self.pipeline.add_component("code_splitter", ASTCodeSplitter())
+        self.pipeline.add_component("controller_extractor", ControllerExtractor())
         self.pipeline.add_component("files_analyzer", FilesAnalyzer(config_path=config_path))
 
         # Wire controller endpoints → code_splitter for deduplication
-        self.pipeline.connect("controller_extractor.endpoints", "code_splitter.endpoints")
+        self.pipeline.connect("controller_extractor.controller_files", "code_splitter.controller_files")
 
     def run(self, files: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
@@ -58,8 +58,8 @@ class AnalysisPipeline:
 
         result = self.pipeline.run(
             {
-                "controller_extractor": {"files": files},
                 "code_splitter": {"files": files},
+                "controller_extractor": {"files": files},
                 "files_analyzer": {"files": files},
             },
             include_outputs_from={"controller_extractor", "code_splitter", "files_analyzer"},
