@@ -33,6 +33,7 @@ TYPESCRIPT/NODE.JS GUIDELINES:
 - Dependencies: Track internal method calls (e.g., `this.userService.findByEmail`) as "class-method" dependencies.
 - Resolve constructor injections to their Type names (e.g., `constructor(private readonly test:PlayerService)` means `this.test` refers to `PlayerService`).
 - Do NOT include framework calls (NestJS decorators, Express middleware, etc.) as dependencies.
+- Null or None must not be included as a dependency. (if you resolved something as null please remove it)
 Example:
     constructor(private readonly test:PlayerService);
 

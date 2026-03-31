@@ -8,6 +8,7 @@ class CSharpStrategy(ExtractorStrategy):
     def _resolve_routing_tokens(self, path: str, class_name: str, method_name: Optional[str] = None) -> str:
         if not path:
             return path
+        
         if "[controller]" in path.lower():
             route_class_name = class_name[:-10] if class_name.endswith("Controller") else class_name
             path = re.sub(r'\[controller\]', route_class_name, path, flags=re.IGNORECASE)

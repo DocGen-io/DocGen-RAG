@@ -1,6 +1,7 @@
 import time
 import os
 import json
+from datetime import datetime
 from typing import Optional, Dict
 
 from src.pipelines.documentation_pipeline import DocumentationPipeline
@@ -58,7 +59,7 @@ class RepositoryEvaluator:
                     structurally_valid = evaluate_structural_validity(generated_swagger)
                     
                     if ground_truth:
-                        acc_metrics = evaluate_accuracy(generated_swagger, ground_truth)
+                        acc_metrics = evaluate_accuracy(generated_swagger, ground_truth,datetime.now().strftime("%d:%H:%M"))
                 else:
                     error_msg = f"Pipeline completed but swagger.json not found at {swagger_file}"
                     

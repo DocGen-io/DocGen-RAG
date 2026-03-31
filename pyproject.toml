@@ -39,9 +39,9 @@ dependencies = [
 [project.scripts]
 ast-extractor = "src.components.extractor.ast_extractor:main"
 documentation-pipeline = "src.pipelines.documentation_pipeline:main"
-
-
-
+query-pipeline = "src.pipelines.query_pipeline:main"
+endpoint-clusterer = "src.components.EndpointClusterer:main"
+fetch-examples = "src.components.FetchExampleGenerator:main"
 [tool.setuptools]
 packages = {find = {where = ["."]}}
 

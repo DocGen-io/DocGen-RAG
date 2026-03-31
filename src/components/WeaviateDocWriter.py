@@ -13,7 +13,7 @@ from haystack import component, Document
 from haystack.components.writers import DocumentWriter
 from haystack.components.embedders import SentenceTransformersDocumentEmbedder
 from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
-
+from src.utils.weaviate_utils import get_weaviate_store
 from src.utils.logger import DocGenLogger
 from src.utils.config_loader import load_config
 
@@ -62,14 +62,23 @@ class WeaviateDocWriter:
                 logger.error(f"Failed to read {swagger_path}: {e}")
                 continue
 
+            tags = swagger_data.get("tags", [])
+            tag_str = ", ".join(tags) if isinstance(tags, list) else str(tags)
+            path = swagger_data.get("path", "")
+            method = swagger_data.get("method", "").upper()
+            summary = swagger_data.get("summary", "")
+            
+            text_content = f"API Endpoint: {method} {path}. Tags: {tag_str}. Summary: {summary}".strip(" .")
+
             doc = Document(
-                content=json.dumps(swagger_data, indent=2),
+                content=text_content,
                 meta={
                     "endpoint_name": endpoint_name,
                     "method": swagger_data.get("method", ""),
                     "path": swagger_data.get("path", ""),
                     "summary": swagger_data.get("summary", ""),
                     "doc_type": "endpoint_documentation",
+                    "raw_json": json.dumps(swagger_data, indent=2),
                 }
             )
             documents.append(doc)
@@ -105,7 +114,6 @@ class WeaviateDocWriter:
         embedded = self.embedder.run(documents=documents)
         embedded_docs = embedded.get("documents", documents)
 
-        from src.utils.weaviate_utils import get_weaviate_store
 
         # Write to Weaviate
         with get_weaviate_store(url=self.weaviate_url) as doc_store:

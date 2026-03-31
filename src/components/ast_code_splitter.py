@@ -54,7 +54,7 @@ class ASTCodeSplitter:
         Returns:
             documents: List of Document objects with rich metadata for Weaviate.
         """
-       
+        all_records: List[ASTOutputRecord] = []
 
         for file_meta in files:
             file_path = file_meta.get("path", "")
@@ -69,6 +69,7 @@ class ASTCodeSplitter:
             try:
                 extractor = GeneralExtractor(language)
                 records: List[ASTOutputRecord] = extractor.extract(file_path, file_meta)
+                all_records.extend(records)
 
 
             except Exception as e:
@@ -77,8 +78,8 @@ class ASTCodeSplitter:
 
 
         logger.info(
-            f"ASTCodeSplitter produced {len(records)} chunks from {len(files)} files"
+            f"ASTCodeSplitter produced {len(all_records)} chunks from {len(files)} files"
             + (f" (skipped {len(controller_files)} controller files)" if controller_files else ""),
             location="ASTCodeSplitter.run",
         )
-        return {"documents": records, "finished": True}
+        return {"documents": all_records, "finished": True}

@@ -1,11 +1,23 @@
 """Configuration loading utilities."""
 import yaml
 import logging
-from typing import Dict, Any
+from typing import Dict, Any,List
 
 logger = logging.getLogger(__name__)
 
 
+
+def get_config_value(key: List[str], config: Dict[str, Any]) -> Any:
+  
+    value = None
+    for k in key:
+        value = config.get(k, None)
+        if value is None:
+            raise ValueError(f"Key {k} not found in config")
+        config = value
+
+    return value
+    
 def load_config(path: str, default: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Load configuration from a YAML file.
