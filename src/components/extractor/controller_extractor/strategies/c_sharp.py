@@ -8,14 +8,14 @@ class CSharpStrategy(ExtractorStrategy):
     def _resolve_routing_tokens(self, path: str, class_name: str, method_name: Optional[str] = None) -> str:
         if not path:
             return path
-        route_class_name = class_name[:-10] if class_name.endswith("Controller") else class_name
         
         if "[controller]" in path.lower():
+            route_class_name = class_name[:-10] if class_name.endswith("Controller") else class_name
             path = re.sub(r'\[controller\]', route_class_name, path, flags=re.IGNORECASE)
         if method_name and "[action]" in path.lower():
             route_method_name = method_name[:-5] if method_name.endswith("Async") else method_name
             path = re.sub(r'\[action\]', route_method_name, path, flags=re.IGNORECASE)
-        return f"/{route_class_name}/{path}"
+        return path
 
     def get_base_path(self, captures: Dict[str, Any], get_capture_text_fn: Callable, code_bytes: bytes, class_name: str) -> Optional[str]:
         raw_base_path = super().get_base_path(captures, get_capture_text_fn, code_bytes, class_name)
