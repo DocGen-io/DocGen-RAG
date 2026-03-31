@@ -69,16 +69,12 @@
         },
         "repos": [
             {
-                "uses": "ASP.NET Core + Couchbase",
-                "repo_url": "https://github.com/mgroves/realworld-aspnet-couchbase"
+                "uses": "ASP.NET Core example 1",
+                "repo_url": "https://github.com/gothinkster/aspnetcore-realworld-example-app"
             },
             {
-                "documentation": {
-                    "origin": "local",
-                    "path": "real-world-microservice-c#.json"
-                },
-                "uses": "ASP.NET Core + Microservices",
-                "repo_url": "https://github.com/profjordanov/realworld-microservices"
+                "uses": "ASP.NET Core example 2",
+                "repo_url": "https://github.com/TomislavVinkovic/realworld-api-asp-net-10"
             }
         ]
     }
