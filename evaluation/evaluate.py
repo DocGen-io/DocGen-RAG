@@ -4,6 +4,7 @@ import os
 import argparse
 import requests
 import pandas as pd
+from src.utils.config_loader import load_config,get_config_value
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, asdict
 from src.pipelines.documentation_pipeline import DocumentationPipeline
@@ -19,20 +20,28 @@ logger = DocGenLogger(__name__)
 class EvaluationOrchestrator:
     """Coordinates reading repositories, running the evaluation, and writing results"""
     
-    def __init__(self, repositories_file: str, output_file: str, model_name: str, description: str = ""):
+    def __init__(self, repositories_file: str, output_file: str, model_name: str, description: str = "",config_path: str = "config.yaml"):
         self.repositories_file = repositories_file
         self.output_file = output_file
         self.general_ground_manager = GroundTruthManager()
         self.description = description
-        
+        self.config = load_config(config_path)
+
+        if model_name is None:
+            active_generator = get_config_value(["doc_creator","active_generator"], self.config)
+            self.model_name = get_config_value(["generators",active_generator,"model"], self.config)
+        else:
+            self.model_name = model_name
+
         # Load historical results ONCE so we don't exponentially duplicate rows during save_results
         if os.path.exists(self.output_file):
             self.historical_df = pd.read_csv(self.output_file)
         else:
             self.historical_df = None
+        
         self.evaluator = RepositoryEvaluator(
             pipeline=DocumentationPipeline(config_path="config.yaml"), 
-            model_name=model_name
+            model_name=self.model_name
         )
         self.results: List[EvaluationRecord] = []
 
@@ -94,7 +103,7 @@ class EvaluationOrchestrator:
 
 def main():
     parser = argparse.ArgumentParser(description="Run automated thesis evaluation harness")
-    parser.add_argument("--model", type=str, default="llama3", help="Name of the model being evaluated")
+    parser.add_argument("--model", type=str, default=None, help="Name of the model being evaluated")
     parser.add_argument("--config", type=str, default="evaluation/repositories.json", help="Path to repositories JSON configuration")
     parser.add_argument("--output", type=str, default="evaluation/data/evaluation_results.csv", help="Output file path for evaluation metrics CSV")
     parser.add_argument("--description", type=str, default="", help="Description of the evaluation")
