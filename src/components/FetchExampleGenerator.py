@@ -7,10 +7,11 @@ in JavaScript (fetch), Python (requests), and cURL.
 """
 
 import json
+import argparse
 from typing import Dict, Any, Optional
+from haystack.dataclasses import ChatMessage
 
 from haystack import component
-
 from src.utils.logger import DocGenLogger
 from src.utils.config_loader import load_config
 from src.utils.modelGenerator import ModelGenerator
@@ -51,7 +52,6 @@ class FetchExampleGenerator:
             parameters=params_str,
             request_body=body_str,
         )
-        from haystack.dataclasses import ChatMessage
         return [
             ChatMessage.from_system(fetch_example_system_prompt),
             ChatMessage.from_user(user_prompt)
@@ -68,16 +68,28 @@ class FetchExampleGenerator:
         Returns:
             Dictionary with 'examples' mapping framework -> code string.
         """
+
         if not swagger_data or not swagger_data.get("path"):
             return {"examples": {}}
 
         prompt = self._build_prompt(swagger_data)
 
         try:
-            result = LLMJsonHandler.parse_with_retry(
-                generator=self.generator, prompt=prompt, max_retries=2
-            )
-            return {"examples": result}
+            message = self.generator.run(messages=prompt)['replies'][0]
+            return message.text
         except Exception as e:
             logger.error(f"Failed to generate fetch examples: {e}")
             return {"examples": {}}
+
+def main():
+    parser = argparse.ArgumentParser(description="Generate fetch code examples for an API endpoint.")
+    parser.add_argument("--swagger_path", type=str, required=True, help="Path to the swagger file.")
+    parser.add_argument("--config_path", type=str, default="config.yaml", help="Path to the config file.")
+    args = parser.parse_args()
+    
+    generator = FetchExampleGenerator(config_path=args.config_path)
+    swagger_data = json.load(open(args.swagger_path))
+    
+    examples = generator.run(swagger_data)
+    
+    logger.info(examples)
