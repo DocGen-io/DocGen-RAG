@@ -224,10 +224,10 @@ class EndpointGraphManager:
                     # Fallback if NOT found in AST chunks
                     origin = item.get("origin") or "Global"
                     
-                    method_type = "unknown"
+                    decorator_type = "unknown"
                     is_api = item.get("is_api_method")
                     if is_api and isinstance(is_api, dict):
-                        method_type = is_api.get("method_type", "unknown")
+                        decorator_type = is_api.get("decorator_type", "unknown")
                         
                     curr_node_id = get_node_id(original_f_name, origin, item_name)
 

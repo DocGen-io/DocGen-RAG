@@ -107,9 +107,9 @@ class GeneralExtractor(BaseASTExtractor):
 
                 method_data = {
                     "method_name": m_name,
-                    "method_type": None,
+                    "decorator_type": None,
                     "is_api_route": False,
-                    "method_path": None,
+                    "decorator_path": None,
                     "method_definition": self._trim_code(self._get_text(m_body, code_bytes)),
                     "node_id": get_node_id(file_name, parent["class_name"] if parent else "Global", m_name)
                 }

@@ -66,8 +66,8 @@ class DocumentationCreator:
         user_prompt = doc_creator_user_prompt.substitute(
             controller_name=method.get("class_name", "Unknown"),
             method_name=method.get("method_name", "unknown"),
-            http_method=method.get("method_type", "GET"),
-            endpoint_path=method.get("method_path", "/"),
+            http_method=method.get("decorator_type", "GET"),
+            endpoint_path=method.get("decorator_path", "/"),
             base_path=method.get("base_path", "/"),
             method_definition=method.get("method_definition", ""),
             dependencies_context=dependencies_context
@@ -151,10 +151,10 @@ class DocumentationCreator:
                 if not isinstance(api_details, dict):
                     api_details = {}
 
-                raw_method_type = str(api_details.get("method_type", "unknown"))
+                raw_decorator_type = str(api_details.get("decorator_type", "unknown"))
                
-                if raw_method_type.lower()  not in API_METHODS:
-                    logger.info(f"Skipping non-REST method {endpoint_id} of type: {raw_method_type}")
+                if raw_decorator_type.lower()  not in API_METHODS:
+                    logger.info(f"Skipping non-REST method {endpoint_id} of type: {raw_decorator_type}")
                     # We still count it as 'processed' so it doesn't skew failure metrics, but we don't document it.
                     methods_processed += 1
                     continue
@@ -162,9 +162,8 @@ class DocumentationCreator:
                 method_info = {
                     "class_name": meta.get("class_name") or (endpoint_id.split(":")[1] if len(endpoint_id.split(":")) > 1 else "Unknown"),
                     "method_name": meta.get("name") or (endpoint_id.split(":")[2] if len(endpoint_id.split(":")) > 2 else "unknown"),
-                    "method_type": raw_method_type.lower(),
-                    # LLM writes 'path', fallback to 'method_path' for older docs
-                    "method_path": api_details.get("path") or api_details.get("method_path") or "/",
+                    "decorator_type": raw_decorator_type.lower(),
+                    "decorator_path": api_details.get("decorator_path") or "/",
                     "base_path": api_details.get("base_path") or "/",
                     "method_definition": endpoint_doc.content
                 }
@@ -209,7 +208,7 @@ class DocumentationCreator:
         Args:
             method_name: The method/endpoint name (used as subdirectory)
             documentation: LLM output dict with a 'swagger' key
-            method_info: Optional dict with method_type, method_path, base_path for enrichment
+            method_info: Optional dict with decorator_type, decorator_path, base_path for enrichment
 
         Returns:
             Dict mapping 'swagger' to the written file path
@@ -222,13 +221,13 @@ class DocumentationCreator:
 
         if method_info:
             base_path = method_info.get("base_path", "")
-            method_path = method_info.get("method_path", "")
-            fallback_path = method_path if method_path.startswith("/") else f"/{method_path}"
-            if base_path and not method_path.startswith(base_path):
-                fallback_path = f"{base_path.rstrip('/')}/{method_path.lstrip('/')}"
+            decorator_path = method_info.get("decorator_path", "")
+            fallback_path = decorator_path if decorator_path.startswith("/") else f"/{decorator_path}"
+            if base_path and not decorator_path.startswith(base_path):
+                fallback_path = f"{base_path.rstrip('/')}/{decorator_path.lstrip('/')}"
             if not fallback_path or fallback_path == "/":
                 fallback_path = f"/{method_name}"
-            swagger_data["method"] = method_info.get("method_type", "get").lower()
+            swagger_data["method"] = method_info.get("decorator_type", "get").lower()
             swagger_data["path"] = fallback_path
 
         swagger_path = os.path.join(method_dir, "swagger.json")

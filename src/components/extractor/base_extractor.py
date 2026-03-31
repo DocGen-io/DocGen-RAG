@@ -15,7 +15,7 @@ from typing import Tuple, Optional, List, Dict, Any
 from src.utils.config_loader import load_config
 from src.utils.logger import DocGenLogger
 from src.utils.types import ASTOutputRecord
-
+from src.utils.weaviate_utils import get_node_id
 
 class BaseASTExtractor:
     """Base class for language-specific AST extraction."""
@@ -124,23 +124,21 @@ class BaseASTExtractor:
 
             for method in class_info.get("methods", []):
                 method_name = method.get("method_name", "")
-                method_type = method.get("method_type") or "unknown"
-                method_path = method.get("method_path") or ""
+                decorator_type = method.get("decorator_type") or "unknown"
+                decorator_path = method.get("decorator_path") or ""
                 definition = self._trim_code(method.get("method_definition", ""))
-                node_id = f"{file_name}:{class_name}:{method_name}:{method_type}"
+                node_id = get_node_id(file_name,class_name,method_name)
                 records.append(ASTOutputRecord(
                     class_name=class_name,
                     method_name=method_name,
                     base_path=base_path,
-                    decorator_type=method_type,
-                    decorator_path=method_path,
+                    decorator_path=decorator_path,
                     method_definition=definition,
                     file_name=file_name,
                     file_path=fp,
                     node_id=node_id,
                     is_api_route=method.get("is_api_route", False),
-                    method_type=method_type,
-                    method_path=method_path,
+                    decorator_type=decorator_type,
                 ))
 
         return records

@@ -37,7 +37,7 @@ class TestDocumentationCreatorContextFetching:
         # Mock Weaviate documents
         def side_effect_fetch(store, node_id):
             if node_id == "controller.ts:TestController:myEndpoint":
-                return [Document(content="Controller Code", meta={"name": "myEndpoint", "type": "method", "api_method_details": '{"method": "myEndpoint", "method_type": "GET", "method_path": "/api", "base_path": "/test"}'})]
+                return [Document(content="Controller Code", meta={"name": "myEndpoint", "type": "method", "api_method_details": '{"method": "myEndpoint", "decorator_type": "GET", "decorator_path": "/api", "base_path": "/test"}'})]
             elif node_id == "service.ts:TestService:findAll":
                 return [Document(content="Service Code", meta={"name": "findAll"})]
             return []

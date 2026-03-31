@@ -79,8 +79,8 @@ class _ControllerQueryExtractor(BaseASTExtractor):
             controllers[class_name]["methods"].append({
                 "method_name": method_name,
                 "method_definition": method_def,
-                "method_type": decorator_type,
-                "method_path": decorator_path,
+                "decorator_type": decorator_type,
+                "decorator_path": decorator_path,
                 "is_api_route": True,
                 "node_id": get_node_id(file_name,class_name,method_name)
             })

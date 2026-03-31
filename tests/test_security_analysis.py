@@ -75,8 +75,8 @@ class TestSecurityInDocumentation:
                 }
 
                 saved = creator._save_outputs("login", documentation, {
-                    "method_type": "POST",
-                    "method_path": "/auth/login"
+                    "decorator_type": "POST",
+                    "decorator_path": "/auth/login"
                 })
 
                 with open(saved["swagger"]) as f:
