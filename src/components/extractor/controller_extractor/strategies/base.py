@@ -1,5 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any, Callable, Tuple
+from src.utils.logger import DocGenLogger
+
+logger = DocGenLogger(__name__)
 
 class ExtractorStrategy(ABC):
     """Base interface for language-specific controller extraction logic."""

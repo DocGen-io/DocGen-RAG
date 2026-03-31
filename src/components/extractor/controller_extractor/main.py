@@ -44,9 +44,9 @@ class _ControllerQueryExtractor(BaseASTExtractor):
         rel_path = file_metadata["relative_path"] if file_metadata and "relative_path" in file_metadata else file_path
 
         controllers: Dict[str, Dict[str, Any]] = {}
-        seen_methods: set = set()
 
         for _, captures in QueryCursor(query).matches(tree.root_node):
+            
             class_name = self._get_capture_text(captures, "class_name", code_bytes, "Global")
 
             # Initialize controller if it's the first time we see this class
@@ -75,11 +75,6 @@ class _ControllerQueryExtractor(BaseASTExtractor):
                     location="_ControllerQueryExtractor.extract",
                 )
                 continue
-
-            dedup_key = (class_name, method_name, decorator_type)
-            if dedup_key in seen_methods:
-                continue
-            seen_methods.add(dedup_key)
 
             controllers[class_name]["methods"].append({
                 "method_name": method_name,
