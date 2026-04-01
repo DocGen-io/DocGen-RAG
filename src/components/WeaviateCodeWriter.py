@@ -54,7 +54,7 @@ class WeaviateCodeWriter:
                 add_on_meta = {
                     "is_api_method":True,
                      "api_method_details": json.dumps({
-                    "method_type": ep.get("decorator_type", "GET"),
+                    "decorator_type": ep.get("decorator_type", "GET"),
                     "path": ep.get("decorator_path", ""),
                     "base_path": ep.get("base_path", "/"),
                 }),

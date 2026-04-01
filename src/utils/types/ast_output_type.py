@@ -6,15 +6,13 @@ class ASTOutputRecord:
     class_name: str
     method_name: str
     base_path: str
-    decorator_type: str
-    decorator_path: str
     method_definition: str
     file_name: str
     file_path: str
     node_id: str
     is_api_route: bool
-    method_type: str
-    method_path: str
+    decorator_type: str
+    decorator_path: str
 
     # ---- Dict-compatible access for downstream consumers ----
 

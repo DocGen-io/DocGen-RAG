@@ -44,6 +44,8 @@ class _ControllerQueryExtractor(BaseASTExtractor):
         rel_path = file_metadata["relative_path"] if file_metadata and "relative_path" in file_metadata else file_path
 
         controllers: Dict[str, Dict[str, Any]] = {}
+        # Intermediate dictionary to track best endpoints per class before converting to list
+        best_endpoints: Dict[str, Dict[str, Any]] = {}
 
         for _, captures in QueryCursor(query).matches(tree.root_node):
             
@@ -59,6 +61,7 @@ class _ControllerQueryExtractor(BaseASTExtractor):
                     "file_path": rel_path,
                     "node_id": get_node_id(file_name,class_name)
                 }
+                best_endpoints[class_name] = {}
 
             base_path = self.strategy.get_base_path(captures, self._get_capture_text, code_bytes, class_name)
             if base_path:
@@ -76,14 +79,20 @@ class _ControllerQueryExtractor(BaseASTExtractor):
                 )
                 continue
 
-            controllers[class_name]["methods"].append({
+            # Use (method_name, decorator_type) as key so the later match overwrites the earlier spurious one
+            dedup_key = (method_name, decorator_type)
+            best_endpoints[class_name][dedup_key] = {
                 "method_name": method_name,
                 "method_definition": method_def,
-                "method_type": decorator_type,
-                "method_path": decorator_path,
+                "decorator_type": decorator_type,
+                "decorator_path": decorator_path,
                 "is_api_route": True,
                 "node_id": get_node_id(file_name,class_name,method_name)
-            })
+            }
+
+        # Convert the best endpoints objects back into a list of endpoints for each controller
+        for class_name, endpoints_dict in best_endpoints.items():
+            controllers[class_name]["methods"] = list(endpoints_dict.values())
 
         # Remove any matched classes that had routes but NO actual HTTP endpoint methods
         valid_controllers = [c for c in controllers.values() if c["methods"]]
