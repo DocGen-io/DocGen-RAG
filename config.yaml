@@ -19,7 +19,7 @@ phoenix_data_dir: "~/.phoenix_data"
 # code mapper settings
 
 code_analyzer:
-  active_generator: "ollama"
+  active_generator: "gemini"
   analyzer_output_path: "analyzer_output"
   dependency_search_top_k: 100
 

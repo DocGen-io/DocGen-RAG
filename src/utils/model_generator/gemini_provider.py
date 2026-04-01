@@ -20,7 +20,7 @@ class GeminiProvider(BaseProvider):
             "temperature": temperature if temperature is not None else 0,
             "top_p": 0.1,
             "response_mime_type": "application/json",
-            "thinking_budget": 0,
+            "thinking_config": None
         })
         
         if seed is not None:
@@ -35,4 +35,4 @@ class GeminiProvider(BaseProvider):
             vertex_ai_location=settings.get("location"),
             model=settings.get("model"),
             generation_kwargs=gen_kwargs,
-        )
+            )
