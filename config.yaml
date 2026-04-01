@@ -32,15 +32,15 @@ generators:
     # model: "llama3"
     model : "qwen2.5-coder:3b"
   gemini:
-    url: "https://generativelanguage.googleapis.com/v1beta/"
-    api_key: ""
-    model: "gemini-2.5-flash"
+    project_id: ${GOOGLE_CLOUD_PROJECT}
+    location: ${GOOGLE_CLOUD_LOCATION}
+    model: "gemini-2.5-flash-lite"
 
 
  
 # Documentation Creator settings
 doc_creator:
-  active_generator: "ollama"
+  active_generator: "gemini"
   output_dir: "output"
 
 # Documentation Merger settings
@@ -53,7 +53,6 @@ doc_merger:
 # App settings
 app:
   environment: "development"
-
 
 # AST Extractor settings
 ast_extractor:
