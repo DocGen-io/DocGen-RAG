@@ -8,7 +8,7 @@ from src.utils.config_loader import load_config
 from src.utils.llm_json_handler import LLMJsonHandler
 from src.utils.weaviate_utils import fetch_by_node_id
 from src.utils.dependency_graph import DependencyGraph
-from src.utils.modelGenerator import ModelGenerator
+from src.utils.model_generator import ModelGenerator
 from haystack.dataclasses import ChatMessage
 from prompts import doc_creator_system_prompt, doc_creator_user_prompt
 from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore

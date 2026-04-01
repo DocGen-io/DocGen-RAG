@@ -4,7 +4,7 @@ import concurrent.futures
 from typing import List, Dict, Any
 from haystack import component
 from src.utils.logger import DocGenLogger
-from src.utils.modelGenerator import ModelGenerator
+from src.utils.model_generator import ModelGenerator
 import threading
 from src.utils.config_loader import load_config
 from src.utils.llm_json_handler import LLMJsonHandler
