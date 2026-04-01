@@ -163,7 +163,7 @@ class DocumentationCreator:
                     "class_name": meta.get("class_name") or (endpoint_id.split(":")[1] if len(endpoint_id.split(":")) > 1 else "Unknown"),
                     "method_name": meta.get("name") or (endpoint_id.split(":")[2] if len(endpoint_id.split(":")) > 2 else "unknown"),
                     "decorator_type": raw_decorator_type.lower(),
-                    "decorator_path": api_details.get("decorator_path") or "/",
+                    "decorator_path": api_details.get("path") or api_details.get("decorator_path") or "/",
                     "base_path": api_details.get("base_path") or "/",
                     "method_definition": endpoint_doc.content
                 }
