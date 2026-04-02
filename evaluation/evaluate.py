@@ -4,6 +4,7 @@ import os
 import argparse
 import requests
 import pandas as pd
+import src.bootstrap
 from src.utils.config_loader import load_config,get_config_value
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, asdict

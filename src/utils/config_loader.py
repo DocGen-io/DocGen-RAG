@@ -1,9 +1,11 @@
 """Configuration loading utilities."""
 import yaml
-import logging
+from src.utils.logger import DocGenLogger
 from typing import Dict, Any,List
+import os
 
-logger = logging.getLogger(__name__)
+
+logger = DocGenLogger(__name__)
 
 
 
@@ -33,7 +35,11 @@ def load_config(path: str, default: Dict[str, Any] = None) -> Dict[str, Any]:
         default = {}
     try:
         with open(path, "r") as f:
-            return yaml.safe_load(f) or default
+            raw_content = f.read()
+        
+        # Expand environment variables on the raw string before parsing YAML   
+        expanded_content = os.path.expandvars(raw_content)
+        return yaml.safe_load(expanded_content) or default
     except FileNotFoundError:
         logger.warning(f"Config file not found: {path}")
         return default

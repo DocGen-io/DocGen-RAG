@@ -14,7 +14,7 @@ from haystack.dataclasses import ChatMessage
 from haystack import component
 from src.utils.logger import DocGenLogger
 from src.utils.config_loader import load_config
-from src.utils.modelGenerator import ModelGenerator
+from src.utils.model_generator import ModelGenerator
 from src.utils.llm_json_handler import LLMJsonHandler
 from prompts import fetch_example_system_prompt, fetch_example_user_prompt
 

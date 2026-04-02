@@ -11,9 +11,9 @@ External interface (run() signature) is unchanged so src/api/main.py needs no ed
 
 import os
 import traceback
+import src.bootstrap
 from typing import Dict, Any, Optional
 import sys
-
 import phoenix as px
 from openinference.instrumentation.haystack import HaystackInstrumentor
 from phoenix.otel import register

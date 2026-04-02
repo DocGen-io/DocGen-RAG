@@ -6,8 +6,8 @@ Two independent on-demand operations (NOT part of the main pipeline):
     - fetch_example()   : FetchExampleGenerator — generate fetch code for a single endpoint
 """
 
+import src.bootstrap
 from typing import Dict, Any, Optional, List
-
 from src.components.EndpointClusterer import EndpointClusterer
 from src.components.FetchExampleGenerator import FetchExampleGenerator
 from src.utils.config_loader import load_config

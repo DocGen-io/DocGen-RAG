@@ -8,7 +8,7 @@ endpoint docs from Weaviate using both:
 
 Results are merged and deduplicated before returning.
 """
-
+import src.bootstrap
 from typing import List, Dict, Any
 from haystack.components.embedders import SentenceTransformersTextEmbedder
 from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
