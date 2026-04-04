@@ -1,8 +1,8 @@
-import phoenix as px
 import time
 import os
 import signal
 import sys
+import phoenix as px
 from src.utils.config_loader import load_config
 
 def handle_shutdown(signum, frame):

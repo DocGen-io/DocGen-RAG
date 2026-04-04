@@ -14,9 +14,6 @@ import traceback
 import src.bootstrap
 from typing import Dict, Any, Optional
 import sys
-import phoenix as px
-from openinference.instrumentation.haystack import HaystackInstrumentor
-from phoenix.otel import register
 
 from src.pipelines.ingestion_pipeline import IngestionPipeline
 from src.pipelines.analysis_pipeline import AnalysisPipeline
@@ -50,6 +47,8 @@ class DocumentationPipeline:
         """Initialize Phoenix tracing if enabled in config."""
         if self.config.get("tracing") and not DocumentationPipeline._instrumented:
             try:
+                from openinference.instrumentation.haystack import HaystackInstrumentor
+                from phoenix.otel import register
                 tracer_provider = register(endpoint="http://127.0.0.1:6006/v1/traces")
                 HaystackInstrumentor().instrument(tracer_provider=tracer_provider)
                 DocumentationPipeline._instrumented = True

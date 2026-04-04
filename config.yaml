@@ -10,9 +10,9 @@ rag:
 
 
 # General Settings
-WEAVIATE_URL: "http://127.0.0.1:8080"
+WEAVIATE_URL: "http://weaviate:8080"
 WEAVIATE_API_KEY: null
-tracing: true
+tracing: false
 phoenix_data_dir: "~/.phoenix_data"
 
 

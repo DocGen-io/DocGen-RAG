@@ -11,7 +11,7 @@ from src.utils.dependency_graph import DependencyGraph
 from src.utils.model_generator import ModelGenerator
 from haystack.dataclasses import ChatMessage
 from prompts import doc_creator_system_prompt, doc_creator_user_prompt
-from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
+from src.utils.weaviate_utils import get_weaviate_store
 from src.utils.definitions import API_METHODS
 
 logger = DocGenLogger(__name__)
@@ -34,9 +34,7 @@ class DocumentationCreator:
         self.generator = ModelGenerator("doc_creator", config_path).get_generator()
         self.config = load_config(config_path)
         self.output_dir = self.config.get("doc_creator", {}).get("output_dir", "output")
-        
-        # Initialize Weaviate document store
-        self.document_store = WeaviateDocumentStore(url=weaviate_url)
+        self.weaviate_url = weaviate_url
     
     def _fetch_dependency_context(self, node_ids: List[str]) -> str:
         """Fetch code context from Weaviate for a list of node IDs."""
@@ -45,16 +43,17 @@ class DocumentationCreator:
             return "No internal dependencies identified."
         
         context_parts = []
-        for node_id in node_ids:
-            docs = fetch_by_node_id(self.document_store, node_id)
-            
-            if docs:
-                doc = docs[0]
-                logger.info(f"[WEAVIATE HIT] node_id='{node_id}' content_len={len(doc.content)} meta_keys={list(doc.meta.keys())}")
-                context_parts.append(f"**{node_id}**:\n{doc.content}\n")
-            else:
-                logger.warning(f"[WEAVIATE MISS] node_id='{node_id}' -> no documents found")
-                context_parts.append(f"**{node_id}**: No additional context available.\n")
+        with get_weaviate_store(url=self.weaviate_url) as doc_store:
+            for node_id in node_ids:
+                docs = fetch_by_node_id(doc_store, node_id)
+                
+                if docs:
+                    doc = docs[0]
+                    logger.info(f"[WEAVIATE HIT] node_id='{node_id}' content_len={len(doc.content)} meta_keys={list(doc.meta.keys())}")
+                    context_parts.append(f"**{node_id}**:\n{doc.content}\n")
+                else:
+                    logger.warning(f"[WEAVIATE MISS] node_id='{node_id}' -> no documents found")
+                    context_parts.append(f"**{node_id}**: No additional context available.\n")
         
         return "\n".join(context_parts) if context_parts else "No dependency context found."
     
@@ -132,7 +131,8 @@ class DocumentationCreator:
 
                 # 3. Extract the endpoint method's details from Weaviate to guide the prompt
                 logger.info(f"[WEAVIATE QUERY] fetch endpoint doc: '{endpoint_id}'")
-                endpoint_doc_list = fetch_by_node_id(self.document_store, endpoint_id)
+                with get_weaviate_store(url=self.weaviate_url) as doc_store:
+                    endpoint_doc_list = fetch_by_node_id(doc_store, endpoint_id)
                 logger.info(f"[WEAVIATE RESULT] endpoint='{endpoint_id}' -> {len(endpoint_doc_list)} doc(s)")
 
                 if not endpoint_doc_list:
