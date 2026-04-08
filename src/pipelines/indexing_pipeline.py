@@ -35,15 +35,17 @@ class IndexingPipeline:
     generates & merges documentation, and commits file hashes on success.
     """
 
-    def __init__(self, config_path: str = "config.yaml"):
+    def __init__(self, config_path: str = "config.yaml",api_details: Optional[Dict[str, Any]] = None):
         config = load_config(config_path)
         weaviate_url = config.get("WEAVIATE_URL") or "http://127.0.0.1:8080"
-
+        self.api_details = api_details
         self.pipeline = AsyncPipeline()
         self._build(weaviate_url, config_path)
+        self.api_details = api_details
 
+            
     def _build(self, weaviate_url: str, config_path: str):
-        self.pipeline.add_component("weaviate_writer", WeaviateCodeWriter(weaviate_url=weaviate_url))
+        self.pipeline.add_component("weaviate_writer", WeaviateCodeWriter(weaviate_url=weaviate_url, config_path=config_path,api_details=self.api_details))
         self.pipeline.add_component("graph_manager", EndpointGraphManager())
         self.pipeline.add_component(
             "doc_creator",
@@ -52,7 +54,7 @@ class IndexingPipeline:
         self.pipeline.add_component("doc_merger", DocumentationMerger(config_path))
         self.pipeline.add_component(
             "weaviate_doc_writer",
-            WeaviateDocWriter(weaviate_url=weaviate_url, config_path=config_path),
+            WeaviateDocWriter(weaviate_url=weaviate_url, config_path=config_path,api_details=self.api_details),
         )
         self.pipeline.add_component("file_hash_saver", FileHashSaver())
 

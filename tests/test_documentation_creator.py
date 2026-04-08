@@ -46,14 +46,14 @@ class TestDocumentationCreatorContextFetching:
         
         with patch.object(DocumentationCreator, '__init__', lambda self: None):
             creator = DocumentationCreator()
-            creator.document_store = Mock()
+            mock_store = Mock()
             creator.generator = Mock()
             creator.output_dir = "temp"
             creator.weaviate_url = "http://fake"
             
             with patch('src.components.DocumentationCreator.get_weaviate_store') as mock_weaviate:
-                # Mock the context manager to yield creator.document_store
-                mock_weaviate.return_value.__enter__.return_value = creator.document_store
+                # Mock the context manager to yield mock_store
+                mock_weaviate.return_value.__enter__.return_value = mock_store
                 
                 with patch.object(LLMJsonHandler, 'parse_with_retry', return_value={"swagger": {"summary": "test"}}):
                     with patch.object(creator, '_save_outputs', return_value={"swagger": "path/file.json"}):
@@ -65,9 +65,9 @@ class TestDocumentationCreatorContextFetching:
                         assert mock_fetch.call_count == 3
                         
                         calls = [
-                            call(creator.document_store, "controller.ts:TestController:myEndpoint"),
-                        call(creator.document_store, "service.ts:TestService:findAll"),
-                        call(creator.document_store, "controller.ts:TestController:myEndpoint")
+                            call(mock_store, "controller.ts:TestController:myEndpoint"),
+                        call(mock_store, "service.ts:TestService:findAll"),
+                        call(mock_store, "controller.ts:TestController:myEndpoint")
                     ]
                     # order may not be strictly guaranteed as get_all_nodes() uses sets
                     mock_fetch.assert_has_calls(calls, any_order=True)

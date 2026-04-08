@@ -33,12 +33,14 @@ class WeaviateCodeWriter:
     def __init__(
         self,
         weaviate_url: str = "http://127.0.0.1:8080",
+        config_path: str = "config.yaml",
+        api_details: Optional[Dict[str, Any]] = None,
         additional_headers: Optional[Dict[str, str]] = None,
     ):
         self.weaviate_url = weaviate_url
         self.additional_headers = additional_headers or {}
-        self.config = load_config("config.yaml")
-
+        self.config = load_config(config_path)
+        self.api_details = api_details
  
     def ast_endpoints_to_documents(self, ast_output: List[ASTOutputRecord],file_type:str='endpoint') -> List[Document]:
         """
@@ -79,6 +81,9 @@ class WeaviateCodeWriter:
                 "decorator_path": ep.get("decorator_path", ""),
                 **add_on_meta
             }
+
+            if self.api_details:
+                meta["api_details"] = json.dumps(self.api_details)
             meta = {k: v for k, v in meta.items() if v is not None}
 
             documents.append(Document(id=doc_id, content=ep.get("method_definition", ""), meta=meta))

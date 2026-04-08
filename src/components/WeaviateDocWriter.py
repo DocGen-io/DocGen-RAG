@@ -32,13 +32,15 @@ class WeaviateDocWriter:
     def __init__(
         self,
         weaviate_url: str = "http://127.0.0.1:8080",
-        config_path: str = "config.yaml"
+        config_path: str = "config.yaml",
+        api_details: Optional[Dict[str, Any]] = None,
     ):
         config = load_config(config_path)
         embedding_model = config.get("rag", {}).get(
             "embedding_model", "sentence-transformers/all-MiniLM-L6-v2"
         )
 
+        self.api_details = api_details
         self.weaviate_url = weaviate_url
         self.embedder = SentenceTransformersDocumentEmbedder(model=embedding_model)
         self.embedder.warm_up()
@@ -81,6 +83,8 @@ class WeaviateDocWriter:
                     "raw_json": json.dumps(swagger_data, indent=2),
                 }
             )
+            if self.api_details:
+                doc.meta["api_details"] = json.dumps(self.api_details)
             documents.append(doc)
 
         return documents

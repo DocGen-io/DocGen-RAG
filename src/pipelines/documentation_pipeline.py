@@ -37,30 +37,20 @@ class DocumentationPipeline:
 
     _instrumented = False
 
-    def __init__(self, config_path: str = "config.yaml"):
+    def __init__(self, config_path: str = "config.yaml",api_details: Optional[Dict[str, Any]] = None):
         self.config = load_config(config_path)
         self.config_path = config_path
-        self._setup_tracing()
+        self.api_details = api_details
 
         self.ingestion = IngestionPipeline()
         self.analysis = AnalysisPipeline(config_path)
-        self.indexing = IndexingPipeline(config_path)
+        self.indexing = IndexingPipeline(config_path,api_details=api_details)
 
-    def _setup_tracing(self):
-        """Initialize Phoenix tracing if enabled in config."""
-        if self.config.get("tracing") and not DocumentationPipeline._instrumented:
-            try:
-                tracer_provider = register(endpoint="http://127.0.0.1:6006/v1/traces")
-                HaystackInstrumentor().instrument(tracer_provider=tracer_provider)
-                DocumentationPipeline._instrumented = True
-                logger.info("Phoenix tracing enabled", location="_setup_tracing")
-            except Exception as e:
-                logger.warning(f"Failed to setup Phoenix tracing: {e}", location="_setup_tracing")
-
+   
     def run(
         self,
         source_type: str,
-        path: str,
+        path: str, 
         credentials: Optional[str] = None,
         api_dir: Optional[str] = None,
     ) -> Dict[str, Any]:
