@@ -32,14 +32,14 @@ class WeaviateCodeWriter:
 
     def __init__(
         self,
-        weaviate_url: str = "http://127.0.0.1:8080",
         config_path: str = "config.yaml",
         api_details: Optional[Dict[str, Any]] = None,
         additional_headers: Optional[Dict[str, str]] = None,
     ):
+        self.config = load_config(config_path)
+        weaviate_url = self.config.get("WEAVIATE_URL", "http://127.0.0.1:8080")
         self.store = WeaviateStore.get_store(url=weaviate_url)
         self.additional_headers = additional_headers or {}
-        self.config = load_config(config_path)
         self.api_details = api_details
  
     def ast_endpoints_to_documents(self, ast_output: List[ASTOutputRecord],file_type:str='endpoint') -> List[Document]:

@@ -42,7 +42,7 @@ class QueryPipeline:
 
     def __init__(self, config_path: str = "config.yaml"):
         config = load_config(config_path)
-        weaviate_url = config.get("WEAVIATE_URL") or "http://127.0.0.1:8080"
+        weaviate_url = "http://weaviate:8080"  # Default for Docker; overridden by config if needed
         rag = config.get("rag", {})
 
         self.top_k = rag.get("top_k_retriever", 2)
@@ -50,7 +50,7 @@ class QueryPipeline:
 
         self.embedder = SentenceTransformersTextEmbedder(model=embedding_model)
         self.embedder.warm_up()
-        self.weaviate_url = config.get("WEAVIATE_URL") or "http://127.0.0.1:8080"
+        self.weaviate_url = weaviate_url
         self.store = WeaviateStore.get_store(url=self.weaviate_url)
 
 

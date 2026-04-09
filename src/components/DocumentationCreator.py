@@ -29,11 +29,11 @@ class DocumentationCreator:
     
     def __init__(
         self,
-        weaviate_url: str = "http://127.0.0.1:8080",
         config_path: str = "config.yaml"
     ):
-        self.generator = ModelGenerator("doc_creator", config_path).get_generator()
         self.config = load_config(config_path)
+        weaviate_url = self.config.get("WEAVIATE_URL", "http://127.0.0.1:8080")
+        self.generator = ModelGenerator("doc_creator", config_path).get_generator()
         self.output_dir = self.config.get("doc_creator", {}).get("output_dir", "output")
         self.store = WeaviateStore.get_store(url= weaviate_url) 
     

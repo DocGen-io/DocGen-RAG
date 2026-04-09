@@ -40,21 +40,21 @@ class IndexingPipeline:
         weaviate_url = config.get("WEAVIATE_URL") or "http://127.0.0.1:8080"
         self.api_details = api_details
         self.pipeline = AsyncPipeline()
-        self._build(weaviate_url, config_path)
+        self._build(config_path)
         self.api_details = api_details
 
             
-    def _build(self, weaviate_url: str, config_path: str):
-        self.pipeline.add_component("weaviate_writer", WeaviateCodeWriter(weaviate_url=weaviate_url, config_path=config_path,api_details=self.api_details))
+    def _build(self, config_path: str):
+        self.pipeline.add_component("weaviate_writer", WeaviateCodeWriter(config_path=config_path,api_details=self.api_details))
         self.pipeline.add_component("graph_manager", EndpointGraphManager())
         self.pipeline.add_component(
             "doc_creator",
-            DocumentationCreator(weaviate_url=weaviate_url, config_path=config_path),
+            DocumentationCreator(config_path=config_path),
         )
-        self.pipeline.add_component("doc_merger", DocumentationMerger(config_path))
+        self.pipeline.add_component("doc_merger", DocumentationMerger(config_path=config_path))
         self.pipeline.add_component(
             "weaviate_doc_writer",
-            WeaviateDocWriter(weaviate_url=weaviate_url, config_path=config_path,api_details=self.api_details),
+            WeaviateDocWriter(config_path=config_path),
         )
         self.pipeline.add_component("file_hash_saver", FileHashSaver())
 
@@ -69,6 +69,8 @@ class IndexingPipeline:
         self.pipeline.connect("doc_creator.output_dir", "weaviate_doc_writer.output_dir")
         # Merger → hash saver (commit only on success)
         self.pipeline.connect("doc_merger.endpoints_merged", "file_hash_saver.merge_status")
+        # Ensure merger waits for doc writer (ordering only)
+        self.pipeline.connect("weaviate_doc_writer.documents_written", "doc_merger.wait_for_weaviate")
 
     def run(
         self,
@@ -112,7 +114,13 @@ class IndexingPipeline:
                     "endpoints": endpoints,
                 },
                 "doc_creator": {"project_name": project_name},
-                "doc_merger": {"project_name": project_name},
+                "doc_merger": {
+                    "project_name": project_name,
+                    "api_details": self.api_details
+                },
+                "weaviate_doc_writer": {
+                    "api_details": self.api_details
+                },
                 "file_hash_saver": {
                     "pending_hashes": pending_hashes,
                     "project_name": project_name,

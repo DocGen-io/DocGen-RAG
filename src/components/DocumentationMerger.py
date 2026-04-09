@@ -13,10 +13,9 @@ import json
 import logging
 
 from src.utils.output_format_builders import SwaggerBuilder
-from src.utils.json_loader import load_json_file
-from src.utils.config_loader import load_config
-from src.utils.folder_scanners import EndpointFolderScanner
 from src.utils.logger import DocGenLogger
+from src.utils.config_loader import load_config
+from src.utils.weaviateStore import WeaviateStore
 
 logger = DocGenLogger(__name__)
 
@@ -41,6 +40,8 @@ class DocumentationMerger:
             config_path: Path to configuration file
         """
         self.config = load_config(config_path)
+        weaviate_url = self.config.get("WEAVIATE_URL", "http://127.0.0.1:8080")
+        self.store = WeaviateStore.get_store(url=weaviate_url)
         
         # Get merger-specific config with defaults
         merger_config = self.config.get("doc_merger", {})
@@ -52,21 +53,27 @@ class DocumentationMerger:
         # Get default output dir from doc_creator config
         doc_creator_config = self.config.get("doc_creator", {})
         self.default_output_dir = doc_creator_config.get("output_dir", "output")
-        self.endpoint_scanner = EndpointFolderScanner()
-    
+
     @component.output_types(
         swagger_path=str,
         endpoints_merged=int
     )
-    def run(self, project_name: str, output_dir: Optional[str] = None) -> Dict[str, Any]:
+    def run(
+        self,
+        project_name: str,
+        output_dir: Optional[str] = None,
+        api_details: Optional[Dict[str, Any]] = None,
+        wait_for_weaviate: Optional[int] = None
+    ) -> Dict[str, Any]:
         """
         Merge all endpoint documentation files into complete output files.
         
         Args:
             project_name: Name of the project to merge docs for
-            output_dir: Path to directory containing endpoint folders.
-                       Defaults to config value if not provided.
-                       
+            output_dir: Path to directory containing endpoint folders (for output saving)
+            api_details: Optional team/project info for filtering
+            wait_for_weaviate: Dummy input for pipeline ordering
+                        
         Returns:
             Dictionary with:
                 - swagger_path: Path to generated swagger.json
@@ -74,12 +81,35 @@ class DocumentationMerger:
         """
         # Use provided output_dir or default from config combined with project_name
         output_dir = output_dir or os.path.join(self.default_output_dir, project_name)
+        os.makedirs(output_dir, exist_ok=True)
         
-        logger.info(f"Starting DocumentationMerger on {output_dir}", location="run")
+        logger.info(f"Starting DocumentationMerger for project: {project_name}", location="run")
         
-        # Scan for endpoint folders
-        endpoints = self.endpoint_scanner.scan(output_dir)
+        # Build filter by doc_type and api_details
+        conditions: List[Dict[str, Any]] = [
+            {"field": "meta.doc_type", "operator": "==", "value": "endpoint_documentation"}
+        ]
         
+        if api_details:
+            if "team_id" in api_details:
+                conditions.append({"field": "meta.team_id", "operator": "==", "value": api_details["team_id"]})
+            if "job_id" in api_details:
+                conditions.append({"field": "meta.job_id", "operator": "==", "value": api_details["job_id"]})
+
+        filters = {
+            "operator": "AND",
+            "conditions": conditions
+        }
+
+        # Fetch from Weaviate
+        docs = self.store.filter_documents(filters=filters)
+        
+        logger.info(f"Fetched {len(docs)} endpoint documents from Weaviate for merging", location="run")
+
+        if not docs:
+            logger.warning(f"No documents found in Weaviate for project {project_name}")
+            return {"swagger_path": "", "endpoints_merged": 0}
+
         # Build Swagger spec
         swagger_builder = SwaggerBuilder(
             title=self.api_title,
@@ -88,14 +118,16 @@ class DocumentationMerger:
             base_url=self.base_url
         )
         
-        swagger_endpoints = [
-            {
-                "method_name": ep["method_name"],
-                "http_method": ep["http_method"],
-                "data": ep["swagger_data"]
-            }
-            for ep in endpoints
-        ]
+        swagger_endpoints = []
+        for doc in docs:
+            raw_json = doc.meta.get("raw_json")
+            if raw_json:
+                swagger_data = json.loads(raw_json)
+                swagger_endpoints.append({
+                    "method_name": doc.meta.get("endpoint_name", "unknown"),
+                    "http_method": doc.meta.get("method", "get"),
+                    "data": swagger_data
+                })
         
         swagger_spec = swagger_builder.build(swagger_endpoints)
         
@@ -107,7 +139,7 @@ class DocumentationMerger:
         
         result = {
             "swagger_path": swagger_path,
-            "endpoints_merged": len(endpoints)
+            "endpoints_merged": len(swagger_endpoints)
         }
         
         logger.info(
