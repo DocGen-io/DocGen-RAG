@@ -20,6 +20,7 @@ from src.utils.weaviate_utils import get_weaviate_store
 from src.utils.config_loader import load_config
 from src.utils.logger import DocGenLogger
 import argparse
+from src.utils.weaviateStore import WeaviateStore
 import json
 logger = DocGenLogger(__name__)
 
@@ -50,6 +51,7 @@ class QueryPipeline:
         self.embedder = SentenceTransformersTextEmbedder(model=embedding_model)
         self.embedder.warm_up()
         self.weaviate_url = config.get("WEAVIATE_URL") or "http://127.0.0.1:8080"
+        self.store = WeaviateStore.get_store(url=self.weaviate_url)
 
 
     def run(self, query: str) -> List[Dict[str, Any]]:
@@ -63,26 +65,26 @@ class QueryPipeline:
             List of endpoint dicts (path, method, summary, content) ordered by relevance.
         """
 
-        with get_weaviate_store(url=self.weaviate_url) as doc_store:
-            semantic_retriever = WeaviateEmbeddingRetriever(
-                document_store=doc_store,
-                top_k=self.top_k,
-                # filters=_ENDPOINT_DOC_FILTER,
-            )
-            keyword_retriever = WeaviateBM25Retriever(
-                document_store=doc_store,
-                top_k=self.top_k,
-                # filters=_ENDPOINT_DOC_FILTER,
-            )
+      
+        semantic_retriever = WeaviateEmbeddingRetriever(
+            document_store=self.store,
+            top_k=self.top_k,
+            # filters=_ENDPOINT_DOC_FILTER,
+        )
+        keyword_retriever = WeaviateBM25Retriever(
+            document_store=self.store,
+            top_k=self.top_k,
+            # filters=_ENDPOINT_DOC_FILTER,
+        )
 
-            logger.info(f"QueryPipeline: querying for '{query}'", location="run")
+        logger.info(f"QueryPipeline: querying for '{query}'", location="run")
 
-            # Semantic retrieval
-            embedding = self.embedder.run(text=query)["embedding"]
-            semantic_docs = semantic_retriever.run(query_embedding=embedding).get("documents", [])
+        # Semantic retrieval
+        embedding = self.embedder.run(text=query)["embedding"]
+        semantic_docs = semantic_retriever.run(query_embedding=embedding).get("documents", [])
 
-            # Keyword retrieval
-            keyword_docs = keyword_retriever.run(query=query).get("documents", [])
+        # Keyword retrieval
+        keyword_docs = keyword_retriever.run(query=query).get("documents", [])
 
         # Merge and deduplicate by (path, method)
         seen: set = set()

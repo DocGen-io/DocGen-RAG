@@ -18,7 +18,7 @@ from haystack.components.writers import DocumentWriter
 from haystack.document_stores.types import DuplicatePolicy
 from src.utils.weaviate_utils import get_weaviate_store,get_node_id
 from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
-
+from src.utils.weaviateStore import WeaviateStore
 
 logger = DocGenLogger(__name__)
 
@@ -37,7 +37,7 @@ class WeaviateCodeWriter:
         api_details: Optional[Dict[str, Any]] = None,
         additional_headers: Optional[Dict[str, str]] = None,
     ):
-        self.weaviate_url = weaviate_url
+        self.store = WeaviateStore.get_store(url=weaviate_url)
         self.additional_headers = additional_headers or {}
         self.config = load_config(config_path)
         self.api_details = api_details
@@ -122,12 +122,11 @@ class WeaviateCodeWriter:
 
         logger.info(f"Writing {len(all_documents)} documents to Weaviate...")
         
-        with get_weaviate_store(url=self.weaviate_url, additional_headers=self.additional_headers) as doc_store:
-            writer = DocumentWriter(
-                document_store=doc_store,
-                policy=DuplicatePolicy.OVERWRITE,
-            )
-            writer.run(documents=all_documents)
+        writer = DocumentWriter(
+            document_store=self.store,
+            policy=DuplicatePolicy.OVERWRITE,
+        )
+        writer.run(documents=all_documents)
 
         logger.info(f"Successfully wrote {len(all_documents)} documents to Weaviate")
         return {"documents":all_documents,"documents_written": len(all_documents)}

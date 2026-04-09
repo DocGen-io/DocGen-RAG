@@ -16,6 +16,7 @@ from sklearn.metrics import davies_bouldin_score
 from src.utils.weaviate_utils import get_weaviate_store
 from src.utils.logger import DocGenLogger
 from src.utils.config_loader import load_config
+from src.utils.weaviateStore import WeaviateStore
 import argparse
 logger = DocGenLogger(__name__)
 
@@ -34,7 +35,8 @@ class EndpointClusterer:
     ):
         config = load_config(config_path)
         self.n_clusters = config.get("endpoint_clusterer", {}).get("n_clusters", "auto")
-        self.weaviate_url = weaviate_url
+        self.store = WeaviateStore.get_store(url=weaviate_url)
+        
 
     def _cluster(
         self,
@@ -105,10 +107,9 @@ class EndpointClusterer:
         """
         # Fetch all endpoint documentation docs
         
-        with get_weaviate_store(url=self.weaviate_url) as doc_store:
-            docs = doc_store.filter_documents(
-                filters={"field": "meta.doc_type", "operator": "==", "value": "endpoint_documentation"}
-            )
+        docs = self.store.filter_documents(
+            filters={"field": "meta.doc_type", "operator": "==", "value": "endpoint_documentation"}
+        )
 
         if not docs:
             logger.warning("No endpoint docs found in Weaviate")

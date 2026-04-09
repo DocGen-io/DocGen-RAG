@@ -16,6 +16,7 @@ from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
 from src.utils.weaviate_utils import get_weaviate_store
 from src.utils.logger import DocGenLogger
 from src.utils.config_loader import load_config
+from src.utils.weaviateStore import WeaviateStore
 
 logger = DocGenLogger(__name__)
 
@@ -41,6 +42,7 @@ class WeaviateDocWriter:
         )
 
         self.api_details = api_details
+        self.store = WeaviateStore.get_store(url=weaviate_url)
         self.weaviate_url = weaviate_url
         self.embedder = SentenceTransformersDocumentEmbedder(model=embedding_model)
         self.embedder.warm_up()
@@ -120,9 +122,8 @@ class WeaviateDocWriter:
 
 
         # Write to Weaviate
-        with get_weaviate_store(url=self.weaviate_url) as doc_store:
-            doc_writer = DocumentWriter(document_store=doc_store)
-            doc_writer.run(documents=embedded_docs)
+        doc_writer = DocumentWriter(document_store=self.store)
+        doc_writer.run(documents=embedded_docs)
 
         logger.info(f"WeaviateDocWriter: stored {len(embedded_docs)} endpoint docs")
         return {"documents_written": len(embedded_docs)}
