@@ -147,5 +147,6 @@ class IndexingPipeline:
             "methods_failed": creator_out.get("methods_failed", 0),
             "endpoints_merged": merger_out.get("endpoints_merged", 0),
             "swagger_path": merger_out.get("swagger_path", ""),
+            "swagger_spec": merger_out.get("swagger_spec", {}),
             "hashes_saved": saver_out.get("hashes_saved", 0),
         }
