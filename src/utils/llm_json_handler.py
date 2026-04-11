@@ -110,7 +110,16 @@ class LLMJsonHandler:
             
         extracted = cls.extract_json(response_str)
         repaired = cls.repair_json(extracted)
-        return json.loads(repaired)
+        try:
+            return json.loads(repaired)
+        except json.JSONDecodeError:
+            # Fallback: if it's a sequence of objects, try wrapping in []
+            if repaired.startswith('{') and not repaired.startswith('['):
+                try:
+                    return json.loads(f"[{repaired}]")
+                except:
+                    pass
+            raise
     
     @classmethod
     def parse_with_retry(
