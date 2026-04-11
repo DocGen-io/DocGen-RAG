@@ -19,8 +19,12 @@ class WeaviateStore:
         if cls._store is None or cls._pid != curr_pid:
             
             # Clean up the 'zombie' reference from the parent process if it exists
+            # NOTE: We do NOT call cls.close() here because if we are in a child process
+            # closing the inherited store might close the shared socket in the parent.
+            # We simply discard the reference and re-initialize.
             if cls._store is not None:
-                cls.close()
+                logger.info(f"Process ID changed from {cls._pid} to {curr_pid}. Discarding inherited WeaviateStore.")
+                cls._store = None
             
             logger.info(f"Initializing WeaviateStore for process ID: {curr_pid}")
             
