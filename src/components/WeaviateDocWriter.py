@@ -14,7 +14,7 @@ from haystack import component, Document
 from haystack.components.writers import DocumentWriter
 from haystack.components.embedders import SentenceTransformersDocumentEmbedder
 from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
-from src.utils.weaviate_utils import get_weaviate_store
+from src.utils.weaviate_utils import get_weaviate_store, get_node_id
 from src.utils.logger import DocGenLogger
 from src.utils.config_loader import load_config
 from src.utils.weaviateStore import WeaviateStore
@@ -76,9 +76,9 @@ class WeaviateDocWriter:
             
             text_content = f"API Endpoint: {method} {path}. Tags: {tag_str}. Summary: {summary}".strip(" .")
 
-            # Generate a stable ID based on method and path to avoid duplicates
-            endpoint_id_str = f"{method}:{path}"
-            doc_id = hashlib.md5(endpoint_id_str.encode()).hexdigest()
+            # Generate a stable ID based on method and path using centralized utility
+            node_id = get_node_id(path, "API", method, api_details=api_details)
+            doc_id = hashlib.sha256(node_id.encode()).hexdigest()
 
             meta = {
                 "endpoint_name": endpoint_name,
@@ -92,7 +92,7 @@ class WeaviateDocWriter:
             if api_details:
                 meta["api_details"] = json.dumps(api_details)
                 # Flatten for easier filtering
-                for key in ["team_id", "job_id", "user_id"]:
+                for key in ["team_id", "job_id", "user_id", "project_name"]:
                     if key in api_details:
                         meta[key] = api_details[key]
 
