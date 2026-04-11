@@ -43,7 +43,7 @@ class TestDocumentCreation:
 
             with patch.object(WeaviateDocWriter, '__init__', lambda self: None):
                 writer = WeaviateDocWriter()
-                docs = writer._swagger_files_to_documents(output_files)
+                docs = writer._swagger_files_to_documents(output_files, api_details=None)
 
                 assert len(docs) == 1
                 doc = docs[0]
@@ -51,6 +51,11 @@ class TestDocumentCreation:
                 assert doc.meta["method"] == "get"
                 assert doc.meta["path"] == "/users/{id}"
                 assert doc.meta["endpoint_name"] == "getUser"
+                assert doc.id is not None
+                # Stable ID for GET:/users/{id} (caps!)
+                import hashlib
+                expected_id = hashlib.md5("GET:/users/{id}".encode()).hexdigest()
+                assert doc.id == expected_id
 
     def test_creates_multiple_documents(self):
         """Multiple endpoints should produce multiple Documents."""
@@ -67,7 +72,7 @@ class TestDocumentCreation:
 
             with patch.object(WeaviateDocWriter, '__init__', lambda self: None):
                 writer = WeaviateDocWriter()
-                docs = writer._swagger_files_to_documents(output_files)
+                docs = writer._swagger_files_to_documents(output_files, api_details=None)
                 assert len(docs) == 2
 
 
@@ -80,7 +85,7 @@ class TestEmptyInput:
             writer = WeaviateDocWriter()
             writer.embedder = Mock()
             writer.doc_writer = Mock()
-            result = writer.run(output_files={}, output_dir="output")
+            result = writer.run(output_files={}, output_dir="output", api_details=None)
             assert result["documents_written"] == 0
 
 
@@ -106,7 +111,7 @@ class TestMetadataExtraction:
 
             with patch.object(WeaviateDocWriter, '__init__', lambda self: None):
                 writer = WeaviateDocWriter()
-                docs = writer._swagger_files_to_documents(output_files)
+                docs = writer._swagger_files_to_documents(output_files, api_details=None)
                 assert docs[0].meta["summary"] == "User login"
 
     def test_document_content_is_full_swagger_json(self):
@@ -126,9 +131,10 @@ class TestMetadataExtraction:
             with patch.object(WeaviateDocWriter, '__init__', lambda self: None):
                 writer = WeaviateDocWriter()
                 docs = writer._swagger_files_to_documents(
-                    {"test": {"swagger": os.path.join(method_dir, "swagger.json")}}
+                    {"test": {"swagger": os.path.join(method_dir, "swagger.json")}},
+                    api_details=None
                 )
-                # Content should be parseable JSON containing full swagger data
-                parsed = json.loads(docs[0].content)
+                # raw_json should be parseable JSON containing full swagger data
+                parsed = json.loads(docs[0].meta["raw_json"])
                 assert parsed["summary"] == "Test"
                 assert len(parsed["parameters"]) == 1

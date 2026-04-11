@@ -21,6 +21,7 @@ from src.components.DocumentationCreator import DocumentationCreator
 from src.components.DocumentationMerger import DocumentationMerger
 from src.components.WeaviateDocWriter import WeaviateDocWriter
 from src.components.FileHashSaver import FileHashSaver
+from src.components.EndpointClusterer import EndpointClusterer
 from src.utils.config_loader import load_config
 from src.utils.types import ASTOutputRecord
 from src.utils.logger import DocGenLogger
@@ -35,25 +36,28 @@ class IndexingPipeline:
     generates & merges documentation, and commits file hashes on success.
     """
 
-    def __init__(self, config_path: str = "config.yaml"):
+    def __init__(self, config_path: str = "config.yaml",api_details: Optional[Dict[str, Any]] = None):
         config = load_config(config_path)
         weaviate_url = config.get("WEAVIATE_URL") or "http://127.0.0.1:8080"
-
+        self.api_details = api_details
         self.pipeline = AsyncPipeline()
-        self._build(weaviate_url, config_path)
+        self._build(config_path)
+        self.api_details = api_details
 
-    def _build(self, weaviate_url: str, config_path: str):
-        self.pipeline.add_component("weaviate_writer", WeaviateCodeWriter(weaviate_url=weaviate_url))
+            
+    def _build(self, config_path: str):
+        self.pipeline.add_component("weaviate_writer", WeaviateCodeWriter(config_path=config_path,api_details=self.api_details))
         self.pipeline.add_component("graph_manager", EndpointGraphManager())
         self.pipeline.add_component(
             "doc_creator",
-            DocumentationCreator(weaviate_url=weaviate_url, config_path=config_path),
+            DocumentationCreator(config_path=config_path),
         )
-        self.pipeline.add_component("doc_merger", DocumentationMerger(config_path))
+        self.pipeline.add_component("doc_merger", DocumentationMerger(config_path=config_path))
         self.pipeline.add_component(
             "weaviate_doc_writer",
-            WeaviateDocWriter(weaviate_url=weaviate_url, config_path=config_path),
+            WeaviateDocWriter(config_path=config_path),
         )
+        self.pipeline.add_component("endpoint_clusterer", EndpointClusterer(config_path=config_path))
         self.pipeline.add_component("file_hash_saver", FileHashSaver())
 
         # Writer → doc creator
@@ -67,6 +71,10 @@ class IndexingPipeline:
         self.pipeline.connect("doc_creator.output_dir", "weaviate_doc_writer.output_dir")
         # Merger → hash saver (commit only on success)
         self.pipeline.connect("doc_merger.endpoints_merged", "file_hash_saver.merge_status")
+        # Ensure merger waits for doc writer (ordering only)
+        self.pipeline.connect("weaviate_doc_writer.documents_written", "doc_merger.wait_for_weaviate")
+        # Ensure clusterer waits for doc writer (ordering only)
+        self.pipeline.connect("weaviate_doc_writer.documents_written", "endpoint_clusterer.wait_for_weaviate")
 
     def run(
         self,
@@ -110,7 +118,13 @@ class IndexingPipeline:
                     "endpoints": endpoints,
                 },
                 "doc_creator": {"project_name": project_name},
-                "doc_merger": {"project_name": project_name},
+                "doc_merger": {
+                    "project_name": project_name,
+                    "api_details": self.api_details
+                },
+                "weaviate_doc_writer": {
+                    "api_details": self.api_details
+                },
                 "file_hash_saver": {
                     "pending_hashes": pending_hashes,
                     "project_name": project_name,
@@ -122,6 +136,7 @@ class IndexingPipeline:
                 "doc_creator",
                 "doc_merger",
                 "file_hash_saver",
+                "endpoint_clusterer",
             },
         )
 
@@ -129,6 +144,7 @@ class IndexingPipeline:
         merger_out = result.get("doc_merger", {})
         creator_out = result.get("doc_creator", {})
         saver_out = result.get("file_hash_saver", {})
+        clusterer_out = result.get("endpoint_clusterer", {})
 
         return {
             "documents_stored": writer_out.get("documents_written", 0),
@@ -137,5 +153,7 @@ class IndexingPipeline:
             "methods_failed": creator_out.get("methods_failed", 0),
             "endpoints_merged": merger_out.get("endpoints_merged", 0),
             "swagger_path": merger_out.get("swagger_path", ""),
+            "swagger_spec": merger_out.get("swagger_spec", {}),
             "hashes_saved": saver_out.get("hashes_saved", 0),
+            "clusters": clusterer_out.get("clusters")
         }
