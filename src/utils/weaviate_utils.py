@@ -5,7 +5,7 @@ This module provides reusable functions for querying Weaviate document store
 with exact match filters on metadata fields.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from haystack.dataclasses import Document
 from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
 from .logger import DocGenLogger
@@ -46,8 +46,41 @@ def fetch_by_method_name(
         return []
 
 
-def get_node_id(file_name: str, class_name: str, method_name: str="none") -> str:
-    return f"{file_name.lower()}:{class_name.lower()}:{method_name.lower()}"
+
+def get_node_id(
+    file_name: str, 
+    class_name: str, 
+    method_name: str = "none",
+    api_details: Optional[Dict[str, Any]] = None
+) -> str:
+    """
+    Generate a unique node ID, optionally namespaced by team/project/job context.
+    
+    Args:
+        file_name: Originating file name
+        class_name: Class name or 'API'
+        method_name: Method or endpoint path
+        api_details: Optional context dictionary or dataclass (APIDetailsRecord)
+    """
+    base = f"{str(file_name).lower()}:{str(class_name).lower()}:{str(method_name).lower()}"
+    
+    if api_details:
+        # Extract namespace markers from api_details (dict or object)
+        ns_parts = []
+        for key in ["team_id", "project_name", "job_id"]:
+            val = None
+            if isinstance(api_details, dict):
+                val = api_details.get(key)
+            else:
+                val = getattr(api_details, key, None)
+            
+            if val:
+                ns_parts.append(str(val))
+        
+        if ns_parts:
+            return f"{base}:{':'.join(ns_parts)}"
+            
+    return base
 
 def fetch_by_class_name(
     document_store: WeaviateDocumentStore,
