@@ -31,8 +31,8 @@ class AnalysisPipeline:
         self._build(config_path)
 
     def _build(self, config_path: str):
-        self.pipeline.add_component("code_splitter", ASTCodeSplitter())
-        self.pipeline.add_component("controller_extractor", ControllerExtractor())
+        self.pipeline.add_component("code_splitter", ASTCodeSplitter(config_path=config_path))
+        self.pipeline.add_component("controller_extractor", ControllerExtractor(config_path=config_path))
         self.pipeline.add_component("files_analyzer", FilesAnalyzer(config_path=config_path))
 
         # Wire controller endpoints → code_splitter for deduplication

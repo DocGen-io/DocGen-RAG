@@ -26,8 +26,9 @@ logger = DocGenLogger(__name__)
 class _ControllerQueryExtractor(BaseASTExtractor):
     """Internal extractor: parses one file using controller-specific queries."""
 
-    def __init__(self, language_name: str):
-        super().__init__(language_name)
+    def __init__(self, language_name: str, config_path: str = "config.yaml"):
+        super().__init__(language_name,config_path)
+        
         self.query_path = os.path.join(
             self.config["queries"]["controllers"],
             f"{language_name}.scm",

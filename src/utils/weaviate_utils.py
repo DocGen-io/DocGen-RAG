@@ -5,7 +5,7 @@ This module provides reusable functions for querying Weaviate document store
 with exact match filters on metadata fields.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from haystack.dataclasses import Document
 from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
 from .logger import DocGenLogger
@@ -46,8 +46,41 @@ def fetch_by_method_name(
         return []
 
 
-def get_node_id(file_name: str, class_name: str, method_name: str="none") -> str:
-    return f"{file_name.lower()}:{class_name.lower()}:{method_name.lower()}"
+
+def get_node_id(
+    file_name: str, 
+    class_name: str, 
+    method_name: str = "none",
+    api_details: Optional[Dict[str, Any]] = None
+) -> str:
+    """
+    Generate a unique node ID, optionally namespaced by team/project/job context.
+    
+    Args:
+        file_name: Originating file name
+        class_name: Class name or 'API'
+        method_name: Method or endpoint path
+        api_details: Optional context dictionary or dataclass (APIDetailsRecord)
+    """
+    base = f"{str(file_name).lower()}:{str(class_name).lower()}:{str(method_name).lower()}"
+    
+    if api_details:
+        # Extract namespace markers from api_details (dict or object)
+        ns_parts = []
+        for key in ["team_id", "project_name", "job_id"]:
+            val = None
+            if isinstance(api_details, dict):
+                val = api_details.get(key)
+            else:
+                val = getattr(api_details, key, None)
+            
+            if val:
+                ns_parts.append(str(val))
+        
+        if ns_parts:
+            return f"{base}:{':'.join(ns_parts)}"
+            
+    return base
 
 def fetch_by_class_name(
     document_store: WeaviateDocumentStore,
@@ -129,3 +162,28 @@ def get_weaviate_store(url: str = "http://127.0.0.1:8080", **kwargs):
                 store.close()
         except Exception as e:
             logger.error(f"Failed to close WeaviateDocumentStore: {e}")
+
+def extract_and_inject_node_id(doc, data: Dict[str, Any], default_path: str = "/", default_method: str = "get") -> Dict[str, Any]:
+    """
+    Extract node_id from Weaviate Document metadata or dynamically generate it.
+    Injects it into the Swagger OpenAPI dictionary as 'x-node-id'.
+    The 'x-' prefix is an OpenAPI standard for vendor extensions.
+    """
+    node_id = doc.meta.get("node_id")
+    if not node_id:
+        api_details = {
+            "team_id": doc.meta.get("team_id"),
+            "project_name": doc.meta.get("project_name")
+        }
+        path = doc.meta.get("path", default_path)
+        node_id = get_node_id(
+            doc.meta.get("file_name"), 
+            doc.meta.get("class_name"), 
+            path, 
+            api_details=api_details
+        )
+        
+    if node_id:
+        data["x-node-id"] = node_id
+        
+    return data

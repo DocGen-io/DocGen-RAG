@@ -6,13 +6,14 @@ from src.utils.logger import DocGenLogger
 from typing import Dict, Any, List, Optional
 from src.utils.config_loader import load_config
 from src.utils.llm_json_handler import LLMJsonHandler
-from src.utils.weaviate_utils import fetch_by_node_id
+from src.utils.weaviate_utils import fetch_by_node_id, get_weaviate_store
 from src.utils.dependency_graph import DependencyGraph
 from src.utils.model_generator import ModelGenerator
 from haystack.dataclasses import ChatMessage
 from prompts import doc_creator_system_prompt, doc_creator_user_prompt
 from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
 from src.utils.definitions import API_METHODS
+from src.utils.weaviateStore import WeaviateStore
 
 logger = DocGenLogger(__name__)
 
@@ -26,19 +27,14 @@ class DocumentationCreator:
     for each API endpoint.
     """
     
-    def __init__(
-        self,
-        weaviate_url: str = "http://127.0.0.1:8080",
-        config_path: str = "config.yaml"
-    ):
-        self.generator = ModelGenerator("doc_creator", config_path).get_generator()
+    def __init__(self, config_path: str = "config.yaml"):
         self.config = load_config(config_path)
+        weaviate_url = self.config.get("WEAVIATE_URL", "http://127.0.0.1:8080")
+        self.store = WeaviateStore.get_store(url=weaviate_url)
+        self.generator = ModelGenerator("doc_creator", config_path).get_generator()
         self.output_dir = self.config.get("doc_creator", {}).get("output_dir", "output")
-        
-        # Initialize Weaviate document store
-        self.document_store = WeaviateDocumentStore(url=weaviate_url)
     
-    def _fetch_dependency_context(self, node_ids: List[str]) -> str:
+    def _fetch_dependency_context(self, store: WeaviateDocumentStore, node_ids: List[str]) -> str:
         """Fetch code context from Weaviate for a list of node IDs."""
         if not node_ids:
             logger.info("No dependency node_ids to fetch")
@@ -46,7 +42,7 @@ class DocumentationCreator:
         
         context_parts = []
         for node_id in node_ids:
-            docs = fetch_by_node_id(self.document_store, node_id)
+            docs = fetch_by_node_id(store, node_id)
             
             if docs:
                 doc = docs[0]
@@ -117,7 +113,7 @@ class DocumentationCreator:
         methods_processed = 0
         methods_failed = 0
         output_files = {}
-
+        
         for endpoint_id, graph in endpoint_graphs.items():
             logger.info(f"Processing endpoint graph: {endpoint_id}")
 
@@ -127,12 +123,13 @@ class DocumentationCreator:
                 logger.info(f"[GRAPH] endpoint={endpoint_id} has {len(node_ids)} dependency node(s): {node_ids}")
 
                 # 2. Fetch context from Weaviate for all nodes
-                dep_context = self._fetch_dependency_context(node_ids)
+                dep_context = self._fetch_dependency_context(self.store, node_ids)
                 
 
                 # 3. Extract the endpoint method's details from Weaviate to guide the prompt
                 logger.info(f"[WEAVIATE QUERY] fetch endpoint doc: '{endpoint_id}'")
-                endpoint_doc_list = fetch_by_node_id(self.document_store, endpoint_id)
+                
+                endpoint_doc_list = fetch_by_node_id(self.store, endpoint_id)
                 logger.info(f"[WEAVIATE RESULT] endpoint='{endpoint_id}' -> {len(endpoint_doc_list)} doc(s)")
 
                 if not endpoint_doc_list:
@@ -152,7 +149,7 @@ class DocumentationCreator:
                     api_details = {}
 
                 raw_decorator_type = str(api_details.get("decorator_type", "unknown"))
-               
+            
                 if raw_decorator_type.lower()  not in API_METHODS:
                     logger.info(f"Skipping non-REST method {endpoint_id} of type: {raw_decorator_type}")
                     # We still count it as 'processed' so it doesn't skew failure metrics, but we don't document it.
@@ -185,7 +182,7 @@ class DocumentationCreator:
             except Exception as e:
                 logger.error(f"Error processing {endpoint_id}: {e}")
                 methods_failed += 1
-        
+    
         result = {
             "methods_processed": methods_processed,
             "methods_failed": methods_failed,

@@ -70,18 +70,33 @@ class TestAutoClusterCount:
     """Test automatic cluster count estimation."""
 
     def test_auto_estimate_returns_reasonable_count(self):
-        """Auto estimation should not exceed number of endpoints."""
+        """Auto estimation logic should return valid n_clusters."""
         with patch.object(EndpointClusterer, '__init__', lambda self: None):
             clusterer = EndpointClusterer()
-            n = clusterer._estimate_clusters(5)
-            assert 1 <= n <= 5
+            # Test via the _cluster method which now handles the estimation
+            endpoints = [{"name": f"ep{i}", "path": f"/p{i}", "summary": "s"} for i in range(5)]
+            embeddings = np.random.rand(5, 10)
+            
+            # This should trigger the auto block
+            result = clusterer._cluster(endpoints, embeddings, n_clusters=None)
+            assert 1 <= len(result) <= 5
 
     def test_auto_estimate_for_small_input(self):
-        """For very few endpoints, should return 1 or 2."""
+        """For very few endpoints, should return 1 or 2 clusters."""
         with patch.object(EndpointClusterer, '__init__', lambda self: None):
             clusterer = EndpointClusterer()
-            assert clusterer._estimate_clusters(1) == 1
-            assert clusterer._estimate_clusters(2) <= 2
+            
+            # 1 endpoint
+            res1 = clusterer._cluster([{"p": "/1", "m":"g", "s":""}], np.array([[1.0]]), n_clusters=None)
+            assert len(res1) == 1
+            
+            # 2 endpoints
+            res2 = clusterer._cluster(
+                [{"p": "/1", "m":"g", "s":""}, {"p": "/2", "m":"g", "s":""}],
+                np.array([[1.0, 0.0], [0.0, 1.0]]),
+                n_clusters=None
+            )
+            assert len(res2) <= 2
 
 
 class TestOutputStructure:

@@ -6,15 +6,13 @@ rag:
   top_k_retriever: 2
   top_k_reranker: 2
   chunk_size: 500
-
-
+process_grouping_automatically: false
 
 # General Settings
-WEAVIATE_URL: "http://127.0.0.1:8080"
-WEAVIATE_API_KEY: null
+WEAVIATE_URL: "${WEAVIATE_URL}"
+WEAVIATE_API_KEY: "${WEAVIATE_API_KEY}"
 tracing: true
 phoenix_data_dir: "~/.phoenix_data"
-
 
 # code mapper settings
 
@@ -23,21 +21,18 @@ code_analyzer:
   analyzer_output_path: "analyzer_output"
   dependency_search_top_k: 100
 
-
 generators:
   ollama:
     url: "http://127.0.0.1:11434"
     api_key: ""
     # model: "qwen3.5:4b"
     # model: "llama3"
-    model : "qwen2.5-coder:3b"
+    model: "qwen2.5-coder:3b"
   gemini:
     project_id: ${GOOGLE_CLOUD_PROJECT}
     location: ${GOOGLE_CLOUD_LOCATION}
     model: "gemini-2.5-flash-lite"
 
-
- 
 # Documentation Creator settings
 doc_creator:
   active_generator: "gemini"
