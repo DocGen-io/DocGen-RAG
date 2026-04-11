@@ -131,18 +131,20 @@ class EndpointClusterer:
         return clusters
 
     @component.output_types(clusters=Dict[str, List[str]], api_details=Optional[Dict[str, Any]])
-    def run(self, n_clusters: Optional[int] = None, api_details: Optional[Dict[str, Any]] = None, wait_for_weaviate: Optional[int] = None) -> Dict[str, Any]:
+    def run(self, n_clusters: Optional[int] = None, api_details: Optional[Dict[str, Any]] = None, wait_for_weaviate: Optional[int] = None, force: bool = False) -> Dict[str, Any]:
         """
         Fetch endpoint docs from Weaviate, extract embeddings, and cluster.
 
         Args:
             n_clusters: Number of clusters. If None, uses config or auto-estimate.
             api_details: Optional project/team context for filtering.
+            wait_for_weaviate: Signal to ensure this runs after WeaviateDocWriter.
+            force: If True, bypass the automatic grouping config check (for manual triggers).
 
         Returns:
             Dictionary with 'clusters' mapping logical_name -> list of "method path".
         """
-        if not self.config.get("process_grouping_automatically", False):
+        if not force and not self.config.get("process_grouping_automatically", False):
             logger.info("Automatic grouping disabled in config. Skipping EndpointClusterer.")
             return {"clusters": None, "api_details": api_details}
 

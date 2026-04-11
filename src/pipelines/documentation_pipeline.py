@@ -21,7 +21,6 @@ from phoenix.otel import register
 from src.pipelines.ingestion_pipeline import IngestionPipeline
 from src.pipelines.analysis_pipeline import AnalysisPipeline
 from src.pipelines.indexing_pipeline import IndexingPipeline
-from src.components.EndpointClusterer import EndpointClusterer
 from src.utils.config_loader import load_config
 from src.utils.logger import DocGenLogger
 
@@ -42,7 +41,7 @@ class DocumentationPipeline:
         self.config = load_config(config_path)
         self.config_path = config_path
         self.api_details = api_details
-        self.ingestion = IngestionPipeline(config_path)
+        self.ingestion = IngestionPipeline()
         self.analysis = AnalysisPipeline(config_path)
         self.indexing = IndexingPipeline(config_path, api_details)
 
