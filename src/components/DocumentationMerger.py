@@ -11,11 +11,11 @@ from typing import Dict, Any, List, Optional
 import os
 import json
 import logging
+from src.utils.weaviateStore import WeaviateStore
 
 from src.utils.output_format_builders import SwaggerBuilder
 from src.utils.logger import DocGenLogger
 from src.utils.config_loader import load_config
-from src.utils.weaviateStore import WeaviateStore
 
 logger = DocGenLogger(__name__)
 
@@ -128,7 +128,8 @@ class DocumentationMerger:
                 swagger_endpoints.append({
                     "method_name": doc.meta.get("endpoint_name", "unknown"),
                     "http_method": doc.meta.get("method", "get"),
-                    "data": swagger_data
+                    "data": swagger_data,
+                    "node_id": doc.meta.get("node_id")
                 })
         
         swagger_spec = swagger_builder.build(swagger_endpoints)
