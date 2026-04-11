@@ -14,9 +14,10 @@ from sklearn.cluster import KMeans
 from haystack import component
 from haystack.dataclasses import ChatMessage
 from sklearn.metrics import davies_bouldin_score
-from src.utils.logger import DocGenLogger
 from src.utils.config_loader import load_config
 from src.utils.weaviateStore import WeaviateStore
+from src.utils.weaviate_utils import get_node_id
+from src.utils.logger import DocGenLogger
 from src.utils.model_generator import ModelGenerator
 from src.utils.llm_json_handler import LLMJsonHandler
 from prompts.cluster_naming_prompt import cluster_naming_system_prompt, cluster_naming_user_prompt
@@ -36,10 +37,10 @@ class EndpointClusterer:
         self,
         config_path: str = "config.yaml"
     ):
-        config = load_config(config_path)
-        weaviate_url = config.get("WEAVIATE_URL", "http://127.0.0.1:8080")
-        self.n_clusters = config.get("endpoint_clusterer", {}).get("n_clusters", "auto")
+        self.config = load_config(config_path)
+        weaviate_url = self.config.get("WEAVIATE_URL", "http://127.0.0.1:8080")
         self.store = WeaviateStore.get_store(url=weaviate_url)
+        self.n_clusters = self.config.get("endpoint_clusterer", {}).get("n_clusters", "auto")
         
         # Initialize LLM for logical naming
         self.generator = ModelGenerator("doc_creator", config_path).get_generator()
@@ -129,21 +130,39 @@ class EndpointClusterer:
 
         return clusters
 
-    @component.output_types(clusters=Dict[str, List[Dict[str, Any]]])
-    def run(self, n_clusters: Optional[int] = None) -> Dict[str, Any]:
+    @component.output_types(clusters=Dict[str, List[str]], api_details=Optional[Dict[str, Any]])
+    def run(self, n_clusters: Optional[int] = None, api_details: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Fetch endpoint docs from Weaviate, extract embeddings, and cluster.
 
         Args:
             n_clusters: Number of clusters. If None, uses config or auto-estimate.
+            api_details: Optional project/team context for filtering.
 
         Returns:
-            Dictionary with 'clusters' mapping logical_name -> endpoint list.
+            Dictionary with 'clusters' mapping logical_name -> list of "method path".
         """
-        # Fetch all endpoint documentation docs
-        docs = self.store.filter_documents(
-            filters={"field": "meta.doc_type", "operator": "==", "value": "endpoint_documentation"}
-        )
+        filters = {"field": "meta.doc_type", "operator": "==", "value": "endpoint_documentation"}
+        
+        # Add project level filtering if api_details are present
+        if api_details:
+            team_id = api_details.get("team_id")
+            project_name = api_details.get("project_name")
+            
+            conditions = [{"field": "meta.doc_type", "operator": "==", "value": "endpoint_documentation"}]
+            if team_id:
+                conditions.append({"field": "meta.team_id", "operator": "==", "value": team_id})
+            if project_name:
+                conditions.append({"field": "meta.project_name", "operator": "==", "value": project_name})
+            
+            if len(conditions) > 1:
+                filters = {
+                    "operator": "AND",
+                    "conditions": conditions
+                }
+
+        # Fetch all filtered endpoint documentation docs
+        docs = self.store.filter_documents(filters=filters)
 
         if not docs:
             logger.warning("No endpoint docs found in Weaviate")
@@ -168,6 +187,7 @@ class EndpointClusterer:
                     "path": path,
                     "method": method,
                     "summary": doc.meta.get("summary", ""),
+                    "node_id": doc.meta.get("node_id") or get_node_id(doc.meta.get("file_name", ""), doc.meta.get("class_name", ""), path, api_details=api_details)
                 })
                 embeddings.append(doc.embedding)
 
@@ -184,8 +204,19 @@ class EndpointClusterer:
         # Name the clusters logically
         named_clusters = self._name_clusters(raw_clusters)
         
+        # Simplify output to just identifiers: "method path"
+        simplified_clusters = {}
+        for name, cluster_endpoints in named_clusters.items():
+            simplified_clusters[name] = [
+                ep['node_id']
+                for ep in cluster_endpoints
+            ]
+        
         logger.info(f"Clustered {len(endpoints)} endpoints into {len(named_clusters)} logical groups")
-        return {"clusters": named_clusters}
+        return {
+            "clusters": simplified_clusters,
+            "api_details": api_details
+        }
 
 
 def main():
