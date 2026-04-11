@@ -41,16 +41,15 @@ class QueryPipeline:
     """
 
     def __init__(self, config_path: str = "config.yaml"):
-        config = load_config(config_path)
-        weaviate_url = "http://weaviate:8080"  # Default for Docker; overridden by config if needed
-        rag = config.get("rag", {})
+        self.config = load_config(config_path)
+        rag = self.config.get("rag", {})
 
         self.top_k = rag.get("top_k_retriever", 2)
         embedding_model = rag.get("embedding_model", "sentence-transformers/all-MiniLM-L6-v2")
 
         self.embedder = SentenceTransformersTextEmbedder(model=embedding_model)
         self.embedder.warm_up()
-        self.weaviate_url = weaviate_url
+        self.weaviate_url = self.config.get("WEAVIATE_URL", "http://weaviate:8080")
         self.store = WeaviateStore.get_store(url=self.weaviate_url)
 
 
@@ -65,7 +64,6 @@ class QueryPipeline:
             List of endpoint dicts (path, method, summary, content) ordered by relevance.
         """
 
-      
         semantic_retriever = WeaviateEmbeddingRetriever(
             document_store=self.store,
             top_k=self.top_k,

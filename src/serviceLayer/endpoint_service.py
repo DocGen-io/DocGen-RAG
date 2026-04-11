@@ -1,6 +1,6 @@
 import json
 from typing import Dict, Any, List, Optional
-from src.utils.weaviate_utils import get_weaviate_store
+from src.utils.weaviate_utils import get_weaviate_store, extract_and_inject_node_id
 from src.utils.logger import DocGenLogger
 
 logger = DocGenLogger(__name__)
@@ -52,6 +52,10 @@ class EndpointService:
                     if path:
                         if path not in paths:
                             paths[path] = {}
+                        
+                        # Inject node_id using standard utility
+                        data = extract_and_inject_node_id(doc, data, default_path=path, default_method=method.upper())
+                            
                         paths[path][method] = data
                 except Exception as e:
                     logger.warning(f"Failed to parse raw_json for document {doc.id}: {e}")
@@ -90,7 +94,9 @@ class EndpointService:
                     logger.error(f"Endpoint document {doc.id} missing raw_json")
                     return None
                     
-                return json.loads(raw_json_str)
+                data = json.loads(raw_json_str)
+                # Inject node_id using standard utility
+                return extract_and_inject_node_id(doc, data, default_path=path, default_method=method.upper())
             except Exception as e:
                 logger.error(f"Failed to fetch endpoint from Weaviate: {e}")
                 return None
