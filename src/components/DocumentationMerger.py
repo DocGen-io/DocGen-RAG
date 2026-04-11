@@ -56,6 +56,7 @@ class DocumentationMerger:
 
     @component.output_types(
         swagger_path=str,
+        swagger_spec=Dict[str, Any],
         endpoints_merged=int
     )
     def run(
@@ -77,6 +78,7 @@ class DocumentationMerger:
         Returns:
             Dictionary with:
                 - swagger_path: Path to generated swagger.json
+                - swagger_spec: The complete Swagger/OpenAPI specification
                 - endpoints_merged: Number of endpoints merged
         """
         # Use provided output_dir or default from config combined with project_name
@@ -139,6 +141,7 @@ class DocumentationMerger:
         
         result = {
             "swagger_path": swagger_path,
+            "swagger_spec": swagger_spec,
             "endpoints_merged": len(swagger_endpoints)
         }
         
