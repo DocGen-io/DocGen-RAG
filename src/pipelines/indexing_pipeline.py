@@ -21,6 +21,7 @@ from src.components.DocumentationCreator import DocumentationCreator
 from src.components.DocumentationMerger import DocumentationMerger
 from src.components.WeaviateDocWriter import WeaviateDocWriter
 from src.components.FileHashSaver import FileHashSaver
+from src.components.EndpointClusterer import EndpointClusterer
 from src.utils.config_loader import load_config
 from src.utils.types import ASTOutputRecord
 from src.utils.logger import DocGenLogger
@@ -56,6 +57,7 @@ class IndexingPipeline:
             "weaviate_doc_writer",
             WeaviateDocWriter(config_path=config_path),
         )
+        self.pipeline.add_component("endpoint_clusterer", EndpointClusterer(config_path=config_path))
         self.pipeline.add_component("file_hash_saver", FileHashSaver())
 
         # Writer → doc creator
@@ -71,6 +73,8 @@ class IndexingPipeline:
         self.pipeline.connect("doc_merger.endpoints_merged", "file_hash_saver.merge_status")
         # Ensure merger waits for doc writer (ordering only)
         self.pipeline.connect("weaviate_doc_writer.documents_written", "doc_merger.wait_for_weaviate")
+        # Ensure clusterer waits for doc writer (ordering only)
+        self.pipeline.connect("weaviate_doc_writer.documents_written", "endpoint_clusterer.wait_for_weaviate")
 
     def run(
         self,
@@ -132,6 +136,7 @@ class IndexingPipeline:
                 "doc_creator",
                 "doc_merger",
                 "file_hash_saver",
+                "endpoint_clusterer",
             },
         )
 
@@ -139,6 +144,7 @@ class IndexingPipeline:
         merger_out = result.get("doc_merger", {})
         creator_out = result.get("doc_creator", {})
         saver_out = result.get("file_hash_saver", {})
+        clusterer_out = result.get("endpoint_clusterer", {})
 
         return {
             "documents_stored": writer_out.get("documents_written", 0),
@@ -149,4 +155,5 @@ class IndexingPipeline:
             "swagger_path": merger_out.get("swagger_path", ""),
             "swagger_spec": merger_out.get("swagger_spec", {}),
             "hashes_saved": saver_out.get("hashes_saved", 0),
+            "clusters": clusterer_out.get("clusters")
         }
