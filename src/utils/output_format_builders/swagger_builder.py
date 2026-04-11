@@ -67,7 +67,12 @@ class SwaggerBuilder(OutputFormatBuilder):
             
             if path not in spec["paths"]:
                 spec["paths"][path] = {}
-            spec["paths"][path][http_method] = self._build_operation(data, http_method, path)
+            
+            operation = self._build_operation(data, http_method, path)
+            if ep.get("node_id"):
+                operation["x-node-id"] = ep["node_id"]
+                
+            spec["paths"][path][http_method] = operation
         
         return spec
     
