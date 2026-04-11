@@ -27,17 +27,14 @@ class DocumentationCreator:
     for each API endpoint.
     """
     
-    def __init__(
-        self,
-        config_path: str = "config.yaml"
-    ):
+    def __init__(self, config_path: str = "config.yaml"):
         self.config = load_config(config_path)
         weaviate_url = self.config.get("WEAVIATE_URL", "http://127.0.0.1:8080")
+        self.store = WeaviateStore.get_store(url=weaviate_url)
         self.generator = ModelGenerator("doc_creator", config_path).get_generator()
         self.output_dir = self.config.get("doc_creator", {}).get("output_dir", "output")
-        self.store = WeaviateStore.get_store(url= weaviate_url) 
     
-    def _fetch_dependency_context(self, node_ids: List[str]) -> str:
+    def _fetch_dependency_context(self, store: WeaviateDocumentStore, node_ids: List[str]) -> str:
         """Fetch code context from Weaviate for a list of node IDs."""
         if not node_ids:
             logger.info("No dependency node_ids to fetch")
@@ -45,7 +42,7 @@ class DocumentationCreator:
         
         context_parts = []
         for node_id in node_ids:
-            docs = fetch_by_node_id(self.store, node_id)
+            docs = fetch_by_node_id(store, node_id)
             
             if docs:
                 doc = docs[0]
@@ -117,8 +114,6 @@ class DocumentationCreator:
         methods_failed = 0
         output_files = {}
         
-        
-        
         for endpoint_id, graph in endpoint_graphs.items():
             logger.info(f"Processing endpoint graph: {endpoint_id}")
 
@@ -128,7 +123,7 @@ class DocumentationCreator:
                 logger.info(f"[GRAPH] endpoint={endpoint_id} has {len(node_ids)} dependency node(s): {node_ids}")
 
                 # 2. Fetch context from Weaviate for all nodes
-                dep_context = self._fetch_dependency_context(node_ids)
+                dep_context = self._fetch_dependency_context(self.store, node_ids)
                 
 
                 # 3. Extract the endpoint method's details from Weaviate to guide the prompt
