@@ -12,9 +12,10 @@ from typing import Dict, Any, List, Optional
 
 from haystack import component, Document
 from haystack.components.writers import DocumentWriter
+from haystack.document_stores.types import DuplicatePolicy
 from haystack.components.embedders import SentenceTransformersDocumentEmbedder
 from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
-from src.utils.weaviate_utils import get_weaviate_store, get_node_id
+from src.utils.weaviate_utils import get_node_id
 from src.utils.logger import DocGenLogger
 from src.utils.config_loader import load_config
 from src.utils.weaviateStore import WeaviateStore
@@ -31,18 +32,14 @@ class WeaviateDocWriter:
     (e.g. "give me all user-related endpoints").
     """
 
-    def __init__(
-        self,
-        config_path: str = "config.yaml",
-        additional_headers: Optional[Dict[str, str]] = None,
-    ):
-        config = load_config(config_path)
-        weaviate_url = config.get("WEAVIATE_URL", "http://127.0.0.1:8080")
-        embedding_model = config.get("rag", {}).get(
+    def __init__(self, config_path: str = "config.yaml"):
+        self.config = load_config(config_path)
+        weaviate_url = self.config.get("WEAVIATE_URL", "http://127.0.0.1:8080")
+        self.store = WeaviateStore.get_store(url=weaviate_url)
+        embedding_model = self.config.get("rag", {}).get(
             "embedding_model", "sentence-transformers/all-MiniLM-L6-v2"
         )
 
-        self.store = WeaviateStore.get_store(url=weaviate_url)
         self.weaviate_url = weaviate_url
         self.embedder = SentenceTransformersDocumentEmbedder(model=embedding_model)
         self.embedder.warm_up()
@@ -87,6 +84,7 @@ class WeaviateDocWriter:
                 "summary": swagger_data.get("summary", ""),
                 "doc_type": "endpoint_documentation",
                 "raw_json": json.dumps(swagger_data, indent=2),
+                "node_id": node_id,
             }
 
             if api_details:
@@ -134,9 +132,13 @@ class WeaviateDocWriter:
         embedded = self.embedder.run(documents=documents)
         embedded_docs = embedded.get("documents", documents)
 
-        # Write to Weaviate
-        doc_writer = DocumentWriter(document_store=self.store)
-        doc_writer.run(documents=embedded_docs)
+        logger.info(f"Writing {len(embedded_docs)} documents to Weaviate...")
+        
+        writer = DocumentWriter(
+            document_store=self.store,
+            policy=DuplicatePolicy.OVERWRITE,
+        )
+        writer.run(documents=embedded_docs)
 
         logger.info(f"WeaviateDocWriter: stored {len(embedded_docs)} endpoint docs")
         return {"documents_written": len(embedded_docs)}

@@ -16,7 +16,7 @@ from typing import List, Dict, Any, Optional
 from src.utils.config_loader import load_config
 from haystack.components.writers import DocumentWriter
 from haystack.document_stores.types import DuplicatePolicy
-from src.utils.weaviate_utils import get_weaviate_store,get_node_id
+from src.utils.weaviate_utils import get_node_id
 from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
 from src.utils.weaviateStore import WeaviateStore
 
@@ -39,6 +39,7 @@ class WeaviateCodeWriter:
         self.config = load_config(config_path)
         weaviate_url = self.config.get("WEAVIATE_URL", "http://127.0.0.1:8080")
         self.store = WeaviateStore.get_store(url=weaviate_url)
+        self.weaviate_url = weaviate_url
         self.additional_headers = additional_headers or {}
         self.api_details = api_details
  
@@ -124,7 +125,7 @@ class WeaviateCodeWriter:
             logger.warning("No documents created to write")
             return {"documents_written": 0}
 
-        logger.info(f"Writing {len(all_documents)} documents to Weaviate...")
+        logger.info(f"Writing {len(all_documents)} code docs to Weaviate...")
         
         writer = DocumentWriter(
             document_store=self.store,
