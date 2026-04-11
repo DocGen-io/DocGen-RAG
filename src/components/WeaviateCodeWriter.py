@@ -49,7 +49,7 @@ class WeaviateCodeWriter:
         
         documents = []
         for ep in ast_output:
-            node_id = get_node_id(ep.get('file_name'),ep.get('class_name'),ep.get('method_name'))
+            node_id = get_node_id(ep.get('file_name'), ep.get('class_name'), ep.get('method_name'), api_details=self.api_details)
             doc_id = hashlib.sha256(node_id.encode()).hexdigest()
 
             if file_type =='endpoint':
@@ -84,6 +84,10 @@ class WeaviateCodeWriter:
 
             if self.api_details:
                 meta["api_details"] = json.dumps(self.api_details)
+                # Flatten for easier filtering
+                for key in ["team_id", "job_id", "user_id", "project_name"]:
+                    if key in self.api_details:
+                        meta[key] = self.api_details[key]
             meta = {k: v for k, v in meta.items() if v is not None}
 
             documents.append(Document(id=doc_id, content=ep.get("method_definition", ""), meta=meta))
