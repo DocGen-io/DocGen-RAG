@@ -6,10 +6,11 @@ rag:
   top_k_retriever: 2
   top_k_reranker: 2
   chunk_size: 500
+process_grouping_automatically: false
 
 # General Settings
-WEAVIATE_URL: "http://weaviate:8080"
-WEAVIATE_API_KEY: null
+WEAVIATE_URL: "${WEAVIATE_URL}"
+WEAVIATE_API_KEY: "${WEAVIATE_API_KEY}"
 tracing: true
 phoenix_data_dir: "~/.phoenix_data"
 
