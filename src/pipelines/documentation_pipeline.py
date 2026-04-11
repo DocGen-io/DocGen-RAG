@@ -21,6 +21,7 @@ from phoenix.otel import register
 from src.pipelines.ingestion_pipeline import IngestionPipeline
 from src.pipelines.analysis_pipeline import AnalysisPipeline
 from src.pipelines.indexing_pipeline import IndexingPipeline
+from src.components.EndpointClusterer import EndpointClusterer
 from src.utils.config_loader import load_config
 from src.utils.logger import DocGenLogger
 
@@ -41,10 +42,9 @@ class DocumentationPipeline:
         self.config = load_config(config_path)
         self.config_path = config_path
         self.api_details = api_details
-
-        self.ingestion = IngestionPipeline()
+        self.ingestion = IngestionPipeline(config_path)
         self.analysis = AnalysisPipeline(config_path)
-        self.indexing = IndexingPipeline(config_path,api_details=api_details)
+        self.indexing = IndexingPipeline(config_path, api_details)
 
    
     def run(
@@ -110,10 +110,15 @@ class DocumentationPipeline:
                 working_dir=working_dir,
             )
 
+            # Stage 4: Automatic grouping has been incorporated into the Indexing Pipeline
+            clusters = indexing_out.get("clusters")
+
             return {
                 "status": "completed",
                 "files": len(files),
                 "endpoints_found": len(endpoints),
+                "clusters": clusters,
+                "endpoints": indexing_out.get("swagger_spec", {}).get("paths", {}),
                 **indexing_out,
             }
 
