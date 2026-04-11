@@ -131,7 +131,7 @@ class EndpointClusterer:
         return clusters
 
     @component.output_types(clusters=Dict[str, List[str]], api_details=Optional[Dict[str, Any]])
-    def run(self, n_clusters: Optional[int] = None, api_details: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def run(self, n_clusters: Optional[int] = None, api_details: Optional[Dict[str, Any]] = None, wait_for_weaviate: Optional[int] = None) -> Dict[str, Any]:
         """
         Fetch endpoint docs from Weaviate, extract embeddings, and cluster.
 
@@ -142,6 +142,10 @@ class EndpointClusterer:
         Returns:
             Dictionary with 'clusters' mapping logical_name -> list of "method path".
         """
+        if not self.config.get("process_grouping_automatically", False):
+            logger.info("Automatic grouping disabled in config. Skipping EndpointClusterer.")
+            return {"clusters": None, "api_details": api_details}
+
         filters = {"field": "meta.doc_type", "operator": "==", "value": "endpoint_documentation"}
         
         # Add project level filtering if api_details are present
