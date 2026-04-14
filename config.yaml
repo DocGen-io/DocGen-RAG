@@ -28,10 +28,13 @@ generators:
     # model: "qwen3.5:4b"
     # model: "llama3"
     model: "qwen2.5-coder:3b"
+    max_tokens: 8192
   gemini:
     project_id: ${GOOGLE_CLOUD_PROJECT}
     location: ${GOOGLE_CLOUD_LOCATION}
     model: "gemini-2.5-flash-lite"
+    # model: "gemini-2.5-pro"
+    max_tokens: 8192
 
 # Documentation Creator settings
 doc_creator:
@@ -49,6 +52,10 @@ doc_merger:
 app:
   environment: "development"
 
+# Query Generator settings
+query_generator:
+  active_generator: "gemini"
+
 # AST Extractor settings
 ast_extractor:
   save_ast: true
@@ -59,6 +66,7 @@ ast_extractor:
 queries:
   general: "queries/general"
   controllers: "queries/controllers-extractors"
+  generated: "queries/generated"
 
 # API frameworks supported for documentation
 api_frameworks: ["NestJS", "SpringBoot", ".NET"]
