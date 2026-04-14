@@ -14,6 +14,9 @@ from typing import Dict, Set
 from tree_sitter_language_pack import get_language
 
 from src.utils.config_loader import load_config
+from src.utils.logger import DocGenLogger
+
+logger = DocGenLogger(__name__)
 
 _COMMENT_RE = re.compile(r";;.*$", re.MULTILINE)
 _CAPTURE_RE = re.compile(r"@([a-zA-Z_][a-zA-Z0-9_]*)")
@@ -233,3 +236,54 @@ def build_known_captures(queries_base: str, query_type: str) -> Set[str]:
         captures |= file_captures - predicate_only
 
     return captures
+
+
+# ── LLM Helpers ──────────────────────────────────────────────────────
+
+def safe_truncate(text: str, limit: int) -> str:
+    """Truncate *text* at a clean line boundary so the LLM never sees
+    broken S-expressions or half-written source lines."""
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rfind("\n")
+    if cut < limit // 2:          # degenerate — just hard-cut
+        cut = limit
+    return text[:cut] + "\n;; ... (truncated for brevity)"
+
+
+def strip_markdown_fences(text: str) -> str:
+    """Remove leading/trailing ``` fences that some models add."""
+    text = text.strip()
+    if text.startswith("```"):
+        lines = text.split("\n")
+        lines = lines[1:]                       # drop opening ```
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]                   # drop closing ```
+        text = "\n".join(lines)
+    return text.strip()
+
+
+def call_with_retry(
+    generator, 
+    messages: list, 
+    label: str, 
+    max_retries: int = 3, 
+    base_delay: float = 2.0
+) -> str:
+    """Call `generator.run(messages=messages)` with exponential backoff."""
+    import time
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = generator.run(messages=messages)["replies"][0]
+            return response.text if hasattr(response, "text") else str(response)
+        except Exception as exc:
+            if attempt == max_retries:
+                raise
+            wait = base_delay * (2 ** (attempt - 1))
+            logger.warning(
+                f"[{label}] Attempt {attempt}/{max_retries} failed: {exc!r}. "
+                f"Retrying in {wait:.0f}s …",
+                location="utils.call_with_retry",
+            )
+            time.sleep(wait)
+    raise RuntimeError("call_with_retry exhausted retries")
