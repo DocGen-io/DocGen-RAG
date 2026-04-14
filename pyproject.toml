@@ -42,6 +42,7 @@ documentation-pipeline = "src.pipelines.documentation_pipeline:main"
 query-pipeline = "src.pipelines.query_pipeline:main"
 endpoint-clusterer = "src.components.EndpointClusterer:main"
 fetch-examples = "src.components.FetchExampleGenerator:main"
+query-gen = "src.pipelines.query_generation_pipeline:main"
 [tool.setuptools]
 packages = {find = {where = ["."]}}
 
