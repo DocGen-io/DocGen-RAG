@@ -13,7 +13,7 @@ from haystack.dataclasses import ChatMessage
 from prompts import doc_creator_system_prompt, doc_creator_user_prompt
 from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
 from src.utils.definitions import API_METHODS
-from src.utils.weaviateStore import WeaviateStore
+from src.utils.weaviateStore import WeaviateStore, resolve_weaviate_url
 
 logger = DocGenLogger(__name__)
 
@@ -29,7 +29,7 @@ class DocumentationCreator:
     
     def __init__(self, config_path: str = "config.yaml"):
         self.config = load_config(config_path)
-        weaviate_url = self.config.get("WEAVIATE_URL", "http://127.0.0.1:8080")
+        weaviate_url = resolve_weaviate_url(self.config)
         self.store = WeaviateStore.get_store(url=weaviate_url)
         self.generator = ModelGenerator("doc_creator", config_path).get_generator()
         self.output_dir = self.config.get("doc_creator", {}).get("output_dir", "output")

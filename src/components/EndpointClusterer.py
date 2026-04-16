@@ -21,6 +21,7 @@ from src.utils.logger import DocGenLogger
 from src.utils.model_generator import ModelGenerator
 from src.utils.llm_json_handler import LLMJsonHandler
 from prompts.cluster_naming_prompt import cluster_naming_system_prompt, cluster_naming_user_prompt
+from src.utils.weaviateStore import resolve_weaviate_url
 import argparse
 
 logger = DocGenLogger(__name__)
@@ -38,7 +39,7 @@ class EndpointClusterer:
         config_path: str = "config.yaml"
     ):
         self.config = load_config(config_path)
-        weaviate_url = self.config.get("WEAVIATE_URL", "http://127.0.0.1:8080")
+        weaviate_url = resolve_weaviate_url(self.config)
         self.store = WeaviateStore.get_store(url=weaviate_url)
         self.n_clusters = self.config.get("endpoint_clusterer", {}).get("n_clusters", "auto")
         
