@@ -25,6 +25,7 @@ from src.components.EndpointClusterer import EndpointClusterer
 from src.utils.config_loader import load_config
 from src.utils.types import ASTOutputRecord
 from src.utils.logger import DocGenLogger
+from src.utils.pipeline_context import PipelineContext
 
 
 logger = DocGenLogger(__name__)
@@ -36,17 +37,13 @@ class IndexingPipeline:
     generates & merges documentation, and commits file hashes on success.
     """
 
-    def __init__(self, config_path: str = "config.yaml",api_details: Optional[Dict[str, Any]] = None):
-        config = load_config(config_path)
-        weaviate_url = config.get("WEAVIATE_URL") or "http://127.0.0.1:8080"
-        self.api_details = api_details
+    def __init__(self, config_path: str = "config.yaml", ctx: Optional[PipelineContext] = None):
+        self.ctx = ctx or PipelineContext()
         self.pipeline = AsyncPipeline()
         self._build(config_path)
-        self.api_details = api_details
 
-            
     def _build(self, config_path: str):
-        self.pipeline.add_component("weaviate_writer", WeaviateCodeWriter(config_path=config_path,api_details=self.api_details))
+        self.pipeline.add_component("weaviate_writer", WeaviateCodeWriter(config_path=config_path, ctx=self.ctx))
         self.pipeline.add_component("graph_manager", EndpointGraphManager())
         self.pipeline.add_component(
             "doc_creator",
@@ -82,7 +79,6 @@ class IndexingPipeline:
         code_chunks: List[ASTOutputRecord],
         file_analysis: List[Dict[str, Any]],
         pending_hashes: Dict[str, str],
-        project_name: str,
         working_dir: str = "",
     ) -> Dict[str, Any]:
         """
@@ -93,7 +89,6 @@ class IndexingPipeline:
             code_chunks: Document list from AnalysisPipeline (ASTCodeSplitter)
             file_analysis: dependency analysis from AnalysisPipeline (FilesAnalyzer)
             pending_hashes: hash map from IngestionPipeline
-            project_name: used for namespacing output dirs
             working_dir: resolved working directory
         """
         if not endpoints:
@@ -106,6 +101,9 @@ class IndexingPipeline:
             location="run",
         )
 
+        # Build the api_details dict for backward-compatible components
+        api_details = self.ctx.to_dict()
+
         result = self.pipeline.run(
             {
                 "weaviate_writer": {
@@ -113,21 +111,22 @@ class IndexingPipeline:
                     "code_chunks": code_chunks,
                 },
                 "graph_manager": {
-                    "project_name": project_name,
+                    "project_name": self.ctx.project_name,
                     "files": file_analysis,
                     "endpoints": endpoints,
                 },
-                "doc_creator": {"project_name": project_name},
+                "doc_creator": {"project_name": self.ctx.project_name},
                 "doc_merger": {
-                    "project_name": project_name,
-                    "api_details": self.api_details
+                    "project_name": self.ctx.project_name,
+                    "api_details": api_details,
                 },
                 "weaviate_doc_writer": {
-                    "api_details": self.api_details
+                    "api_details": api_details,
+                    "project_name": self.ctx.project_name,
                 },
                 "file_hash_saver": {
                     "pending_hashes": pending_hashes,
-                    "project_name": project_name,
+                    "project_name": self.ctx.project_name,
                 },
             },
             include_outputs_from={
