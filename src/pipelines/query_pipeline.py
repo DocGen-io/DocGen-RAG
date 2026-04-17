@@ -15,7 +15,6 @@ import argparse
 from typing import List, Dict, Any, Optional
 
 import src.bootstrap
-from haystack.components.embedders import SentenceTransformersTextEmbedder
 from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
 from haystack_integrations.components.retrievers.weaviate import (
     WeaviateEmbeddingRetriever,
@@ -27,6 +26,7 @@ from src.utils.logger import DocGenLogger
 from src.utils.weaviateStore import WeaviateStore
 from src.utils.rbac_utils import build_rbac_filters
 from src.utils.weaviateStore import resolve_weaviate_url
+from src.components.embedders import EmbedderFactory
 
 logger = DocGenLogger(__name__)
 
@@ -43,10 +43,9 @@ class QueryPipeline:
         rag = self.config.get("rag", {})
 
         self.top_k = rag.get("top_k_retriever", 2)
-        embedding_model = rag.get("embedding_model", "sentence-transformers/all-MiniLM-L6-v2")
-
-        self.embedder = SentenceTransformersTextEmbedder(model=embedding_model)
-        self.embedder.warm_up()
+        
+        provider = EmbedderFactory.create(self.config)
+        self.embedder = provider.get_text_embedder()
         self.weaviate_url = resolve_weaviate_url(self.config)
         self.store = WeaviateStore.get_store(url=self.weaviate_url)
 

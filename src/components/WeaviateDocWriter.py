@@ -13,13 +13,13 @@ from typing import Dict, Any, List, Optional
 from haystack import component, Document
 from haystack.components.writers import DocumentWriter
 from haystack.document_stores.types import DuplicatePolicy
-from haystack.components.embedders import SentenceTransformersDocumentEmbedder
 from src.utils.weaviate_utils import get_node_id
 from src.utils.logger import DocGenLogger
 from src.utils.config_loader import load_config
 from src.utils.weaviateStore import WeaviateStore, resolve_weaviate_url
 from src.utils.rbac_utils import apply_rbac_metadata
 from src.utils.pipeline_context import PipelineContext
+from src.components.embedders import EmbedderFactory
 
 logger = DocGenLogger(__name__)
 
@@ -37,11 +37,8 @@ class WeaviateDocWriter:
         config = load_config(config_path)
         weaviate_url = resolve_weaviate_url(config)
         self.store = WeaviateStore.get_store(url=weaviate_url)
-        embedding_model = config.get("rag", {}).get(
-            "embedding_model", "sentence-transformers/all-MiniLM-L6-v2"
-        )
-        self.embedder = SentenceTransformersDocumentEmbedder(model=embedding_model)
-        self.embedder.warm_up()
+        provider = EmbedderFactory.create(config)
+        self.embedder = provider.get_document_embedder()
         self.ctx = PipelineContext()
 
     def _swagger_files_to_documents(
