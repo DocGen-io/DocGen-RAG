@@ -12,6 +12,15 @@ fetch_example_prompt = _Template(fetch_example_system_prompt)
 # Alias so `from prompts import file_analyzer_system_prompt` works
 file_analyzer_system_prompt = default_analyzer_system_prompt
 
+from .query_generation_prompts import (
+    micro_snippet_system_prompt,
+    micro_snippet_user_prompt,
+    query_gen_system_prompt,
+    query_gen_user_prompt,
+    query_repair_system_prompt,
+    query_repair_user_prompt,
+)
+
 __all__ = [
     "doc_creator_system_prompt",
     "doc_creator_user_prompt",
@@ -24,4 +33,10 @@ __all__ = [
     "file_analyzer_prompt",
     "fetch_example_prompt",
     "get_file_analyzer_system_prompt",
+    "micro_snippet_system_prompt",
+    "micro_snippet_user_prompt",
+    "query_gen_system_prompt",
+    "query_gen_user_prompt",
+    "query_repair_system_prompt",
+    "query_repair_user_prompt",
 ]

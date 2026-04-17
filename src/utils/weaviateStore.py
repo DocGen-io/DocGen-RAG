@@ -4,6 +4,24 @@ from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_WEAVIATE_URL = "http://127.0.0.1:8080"
+
+
+def resolve_weaviate_url(config: dict) -> str:
+    """
+    Resolve the Weaviate URL from a config dict.
+
+    Handles three failure modes:
+      1. Key missing entirely  ->  returns default
+      2. Key present but empty string (env var not set)  ->  returns default
+      3. Key holds an unexpanded placeholder like "${WEAVIATE_URL}"  ->  returns default
+    """
+    raw = config.get("WEAVIATE_URL", "")
+    if not raw or raw.startswith("${"):
+        return DEFAULT_WEAVIATE_URL
+    return raw
+
+
 class WeaviateStore:
     _store = None
     _pid = None  # Crucial for Celery/FastAPI process safety
@@ -28,6 +46,11 @@ class WeaviateStore:
             
             logger.info(f"Initializing WeaviateStore for process ID: {curr_pid}")
             
+            # Final safety check on URL
+            if not url or not (url.startswith("http://") or url.startswith("https://")):
+                logger.warning(f"Invalid Weaviate URL '{url}', falling back to local default")
+                url = "http://127.0.0.1:8080"
+
             # This is the actual initialization
             cls._store = WeaviateDocumentStore(url=url, **kwargs)
             cls._pid = curr_pid

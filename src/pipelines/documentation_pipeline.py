@@ -23,6 +23,8 @@ from src.pipelines.analysis_pipeline import AnalysisPipeline
 from src.pipelines.indexing_pipeline import IndexingPipeline
 from src.utils.config_loader import load_config
 from src.utils.logger import DocGenLogger
+from src.utils.rbac_utils import get_project_name
+from src.utils.pipeline_context import PipelineContext
 
 
 logger = DocGenLogger(__name__)
@@ -37,13 +39,13 @@ class DocumentationPipeline:
 
     _instrumented = False
 
-    def __init__(self, config_path: str = "config.yaml",api_details: Optional[Dict[str, Any]] = None):
+    def __init__(self, config_path: str = "config.yaml", ctx: Optional[PipelineContext] = None):
         self.config = load_config(config_path)
         self.config_path = config_path
-        self.api_details = api_details
+        self.ctx = ctx or PipelineContext()
         self.ingestion = IngestionPipeline()
         self.analysis = AnalysisPipeline(config_path)
-        self.indexing = IndexingPipeline(config_path, api_details)
+        self.indexing = IndexingPipeline(config_path, ctx=self.ctx)
 
    
     def run(
@@ -65,11 +67,20 @@ class DocumentationPipeline:
             Dictionary with pipeline metrics or error info
         """
         try:
-            project_name = os.path.basename(os.path.normpath(path)).split("/")[-1]
-            if project_name.endswith(".git"):
-                project_name = project_name[:-4]
-            if not project_name:
-                project_name = "default_project"
+            project_name = get_project_name(path)
+            # Update ctx so all downstream components see the project_name
+            self.ctx.project_name = project_name
+
+            # Local defaults — ensures RBAC metadata is always written to
+            # Weaviate so that downstream filter queries don't crash on
+            # missing properties.
+            import socket
+            if not self.ctx.job_id:
+                self.ctx.job_id = project_name
+            if not self.ctx.user_id:
+                self.ctx.user_id = socket.gethostname()
+            if not self.ctx.team_id:
+                self.ctx.team_id = "default_team"
 
             logger.info(f"Starting pipeline for '{project_name}' ({source_type}:{path})", location="documentation_pipeline.run")
 
@@ -105,7 +116,6 @@ class DocumentationPipeline:
                 code_chunks=code_chunks,
                 file_analysis=file_analysis,
                 pending_hashes=pending_hashes,
-                project_name=project_name,
                 working_dir=working_dir,
             )
 
