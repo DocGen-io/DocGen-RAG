@@ -16,7 +16,6 @@ dependencies = [
     "uvicorn",
     "haystack-ai",
     "weaviate-haystack",
-    "sentence-transformers",
     "gitpython",
     "pydantic-settings",
     "pyyaml",
@@ -27,7 +26,6 @@ dependencies = [
     "openinference-instrumentation-haystack",
     "ollama-haystack",
     "google-genai-haystack",
-    "accelerate",
     "tree-sitter",
     "tree-sitter-language-pack",
     "gitignore-parser>=0.1.13",
@@ -42,6 +40,7 @@ documentation-pipeline = "src.pipelines.documentation_pipeline:main"
 query-pipeline = "src.pipelines.query_pipeline:main"
 endpoint-clusterer = "src.components.EndpointClusterer:main"
 fetch-examples = "src.components.FetchExampleGenerator:main"
+query-gen = "src.pipelines.query_generation_pipeline:main"
 [tool.setuptools]
 packages = {find = {where = ["."]}}
 

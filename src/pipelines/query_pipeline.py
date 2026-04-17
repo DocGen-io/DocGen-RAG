@@ -8,9 +8,13 @@ endpoint docs from Weaviate using both:
 
 Results are merged and deduplicated before returning.
 """
+import os
+import hashlib
+import json
+import argparse
+from typing import List, Dict, Any, Optional
+
 import src.bootstrap
-from typing import List, Dict, Any
-from haystack.components.embedders import SentenceTransformersTextEmbedder
 from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
 from haystack_integrations.components.retrievers.weaviate import (
     WeaviateEmbeddingRetriever,
@@ -19,18 +23,12 @@ from haystack_integrations.components.retrievers.weaviate import (
 from src.utils.weaviate_utils import get_weaviate_store
 from src.utils.config_loader import load_config
 from src.utils.logger import DocGenLogger
-import argparse
 from src.utils.weaviateStore import WeaviateStore
-import json
+from src.utils.rbac_utils import build_rbac_filters
+from src.utils.weaviateStore import resolve_weaviate_url
+from src.components.embedders import EmbedderFactory
+
 logger = DocGenLogger(__name__)
-
-# Filter: only endpoint documentation (not raw code chunks)
-_ENDPOINT_DOC_FILTER = {
-    "field": "meta.doc_type",
-    "operator": "==",
-    "value": "endpoint_documentation",
-}
-
 
 class QueryPipeline:
     """
@@ -45,34 +43,51 @@ class QueryPipeline:
         rag = self.config.get("rag", {})
 
         self.top_k = rag.get("top_k_retriever", 2)
-        embedding_model = rag.get("embedding_model", "sentence-transformers/all-MiniLM-L6-v2")
-
-        self.embedder = SentenceTransformersTextEmbedder(model=embedding_model)
-        self.embedder.warm_up()
-        self.weaviate_url = self.config.get("WEAVIATE_URL", "http://weaviate:8080")
+        
+        provider = EmbedderFactory.create(self.config)
+        self.embedder = provider.get_text_embedder()
+        self.weaviate_url = resolve_weaviate_url(self.config)
         self.store = WeaviateStore.get_store(url=self.weaviate_url)
 
 
-    def run(self, query: str) -> List[Dict[str, Any]]:
+    def run(
+        self, 
+        query: str, 
+        user_id: Optional[str] = None, 
+        job_id: Optional[str] = None, 
+        team_id: Optional[str] = None, 
+        project_name: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """
         Search for API endpoints matching the given natural-language query.
 
         Args:
             query: Free-text description, e.g. "user authentication endpoint".
+            user_id: Optional user ID filter
+            job_id: Optional job ID filter
+            team_id: Optional team ID filter
+            project_id: Optional project ID filter
 
         Returns:
             List of endpoint dicts (path, method, summary, content) ordered by relevance.
         """
 
+        filters = build_rbac_filters(
+            user_id=user_id,
+            job_id=job_id,
+            team_id=team_id,
+            project_name=project_name,
+        )
+
         semantic_retriever = WeaviateEmbeddingRetriever(
             document_store=self.store,
             top_k=self.top_k,
-            # filters=_ENDPOINT_DOC_FILTER,
+            filters=filters,
         )
         keyword_retriever = WeaviateBM25Retriever(
             document_store=self.store,
             top_k=self.top_k,
-            # filters=_ENDPOINT_DOC_FILTER,
+            filters=filters,
         )
 
         logger.info(f"QueryPipeline: querying for '{query}'", location="run")

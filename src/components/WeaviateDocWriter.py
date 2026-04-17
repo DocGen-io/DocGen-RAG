@@ -13,12 +13,13 @@ from typing import Dict, Any, List, Optional
 from haystack import component, Document
 from haystack.components.writers import DocumentWriter
 from haystack.document_stores.types import DuplicatePolicy
-from haystack.components.embedders import SentenceTransformersDocumentEmbedder
-from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
 from src.utils.weaviate_utils import get_node_id
 from src.utils.logger import DocGenLogger
 from src.utils.config_loader import load_config
-from src.utils.weaviateStore import WeaviateStore
+from src.utils.weaviateStore import WeaviateStore, resolve_weaviate_url
+from src.utils.rbac_utils import apply_rbac_metadata
+from src.utils.pipeline_context import PipelineContext
+from src.components.embedders import EmbedderFactory
 
 logger = DocGenLogger(__name__)
 
@@ -33,21 +34,16 @@ class WeaviateDocWriter:
     """
 
     def __init__(self, config_path: str = "config.yaml"):
-        self.config = load_config(config_path)
-        weaviate_url = self.config.get("WEAVIATE_URL", "http://127.0.0.1:8080")
+        config = load_config(config_path)
+        weaviate_url = resolve_weaviate_url(config)
         self.store = WeaviateStore.get_store(url=weaviate_url)
-        embedding_model = self.config.get("rag", {}).get(
-            "embedding_model", "sentence-transformers/all-MiniLM-L6-v2"
-        )
-
-        self.weaviate_url = weaviate_url
-        self.embedder = SentenceTransformersDocumentEmbedder(model=embedding_model)
-        self.embedder.warm_up()
+        provider = EmbedderFactory.create(config)
+        self.embedder = provider.get_document_embedder()
+        self.ctx = PipelineContext()
 
     def _swagger_files_to_documents(
-        self, 
+        self,
         output_files: Dict[str, Dict[str, str]],
-        api_details: Optional[Dict[str, Any]] = None
     ) -> List[Document]:
         """Convert swagger output files to Haystack Documents for embedding."""
         documents = []
@@ -70,11 +66,10 @@ class WeaviateDocWriter:
             path = swagger_data.get("path", "")
             method = swagger_data.get("method", "").upper()
             summary = swagger_data.get("summary", "")
-            
+
             text_content = f"API Endpoint: {method} {path}. Tags: {tag_str}. Summary: {summary}".strip(" .")
 
-            # Generate a stable ID based on method and path using centralized utility
-            node_id = get_node_id(path, "API", method, api_details=api_details)
+            node_id = get_node_id(path, "API", method, api_details=self.ctx.to_dict())
             doc_id = hashlib.sha256(node_id.encode()).hexdigest()
 
             meta = {
@@ -87,16 +82,15 @@ class WeaviateDocWriter:
                 "node_id": node_id,
             }
 
-            if api_details:
-                meta["api_details"] = json.dumps(api_details)
-                # Flatten for easier filtering
-                for key in ["team_id", "job_id", "user_id", "project_name"]:
-                    if key in api_details:
-                        meta[key] = api_details[key]
+            meta = apply_rbac_metadata(
+                meta=meta,
+                user_id=self.ctx.user_id,
+                job_id=self.ctx.job_id,
+                team_id=self.ctx.team_id,
+                project_name=self.ctx.project_name,
+            )
 
-            # Clear None values
             meta = {k: v for k, v in meta.items() if v is not None}
-
             documents.append(Document(id=doc_id, content=text_content, meta=meta))
 
         return documents
@@ -106,7 +100,8 @@ class WeaviateDocWriter:
         self,
         output_files: Dict[str, Dict[str, str]],
         output_dir: str,
-        api_details: Optional[Dict[str, Any]] = None
+        project_name: Optional[str] = None,
+        api_details: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, int]:
         """
         Vectorize and store endpoint documentation in Weaviate.
@@ -114,16 +109,22 @@ class WeaviateDocWriter:
         Args:
             output_files: Dict from DocumentationCreator (method_name -> file paths)
             output_dir: Output directory (unused, kept for pipeline wiring)
-            api_details: Optional team/project info for filtering
-
-        Returns:
-            Dictionary with count of documents written
+            project_name: Unique name for the project (updates ctx)
+            api_details: Optional legacy dict (updates ctx for backward compat)
         """
+        # Accept pipeline-level overrides for backward compatibility
+        if project_name:
+            self.ctx.project_name = project_name
+        if api_details:
+            self.ctx.user_id = self.ctx.user_id or api_details.get("user_id")
+            self.ctx.team_id = self.ctx.team_id or api_details.get("team_id")
+            self.ctx.job_id = self.ctx.job_id or api_details.get("job_id")
+
         if not output_files:
             logger.warning("No output files to vectorize")
             return {"documents_written": 0}
 
-        documents = self._swagger_files_to_documents(output_files, api_details=api_details)
+        documents = self._swagger_files_to_documents(output_files)
 
         if not documents:
             return {"documents_written": 0}
@@ -133,7 +134,7 @@ class WeaviateDocWriter:
         embedded_docs = embedded.get("documents", documents)
 
         logger.info(f"Writing {len(embedded_docs)} documents to Weaviate...")
-        
+
         writer = DocumentWriter(
             document_store=self.store,
             policy=DuplicatePolicy.OVERWRITE,

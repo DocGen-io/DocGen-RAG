@@ -16,6 +16,7 @@ from src.utils.weaviateStore import WeaviateStore
 from src.utils.output_format_builders import SwaggerBuilder
 from src.utils.logger import DocGenLogger
 from src.utils.config_loader import load_config
+from src.utils.weaviateStore import resolve_weaviate_url
 
 logger = DocGenLogger(__name__)
 
@@ -40,7 +41,7 @@ class DocumentationMerger:
             config_path: Path to configuration file
         """
         self.config = load_config(config_path)
-        weaviate_url = self.config.get("WEAVIATE_URL", "http://127.0.0.1:8080")
+        weaviate_url = resolve_weaviate_url(self.config)
         self.store = WeaviateStore.get_store(url=weaviate_url)
         
         # Get merger-specific config with defaults
@@ -105,12 +106,12 @@ class DocumentationMerger:
 
         # Fetch from Weaviate
         docs = self.store.filter_documents(filters=filters)
-        
+                
         logger.info(f"Fetched {len(docs)} endpoint documents from Weaviate for merging", location="run")
 
         if not docs:
             logger.warning(f"No documents found in Weaviate for project {project_name}")
-            return {"swagger_path": "", "endpoints_merged": 0}
+            return {"swagger_path": "", "swagger_spec": {}, "endpoints_merged": 0}
 
         # Build Swagger spec
         swagger_builder = SwaggerBuilder(

@@ -11,16 +11,17 @@ class OllamaProvider(BaseProvider):
         format_schema: Optional[Dict],
         extra_kwargs: Optional[Dict[str, Any]] = None
     ) -> OllamaChatGenerator:
-        gen_kwargs = extra_kwargs.copy() if extra_kwargs else {}
+        gen_kwargs = self._get_common_params(settings, temperature, seed, extra_kwargs)
         
-        # Schema for constrained decoding, or plain "json" as fallback
-        gen_kwargs["format"] = format_schema if format_schema else "json"
+        # Map standardized names to Ollama-specific names
+        max_tokens = gen_kwargs.pop("max_tokens")
+        gen_kwargs["num_predict"] = max_tokens
         
-        # Default to temperature=0 for deterministic output
-        gen_kwargs["temperature"] = temperature if temperature is not None else 0
-        
-        if seed is not None:
-            gen_kwargs["seed"] = seed
+        # Standardized JSON/Text logic (matching Gemini behavior)
+        if format_schema:
+            gen_kwargs["format"] = format_schema
+        else:
+            gen_kwargs["format"] = ""
 
         return OllamaChatGenerator(
             model=settings.get("model"),
