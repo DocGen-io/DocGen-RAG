@@ -33,8 +33,10 @@ AUTO_GROUP="${INPUT_AUTO_GROUP:-false}"
 
 if [ "$LLM_PROVIDER" = "gemini" ] || [ "$ACTIVE_EMBEDDER" = "gemini" ]; then
   if [ -z "${GEMINI_API_KEY:-}" ]; then
-    echo "::error:: 'gemini-api-key' is required when llm-provider or active-embedder is 'gemini'."
-    exit 1
+    if [ -z "${GOOGLE_CLOUD_PROJECT:-}" ] || [ -z "${GOOGLE_CLOUD_LOCATION:-}" ]; then
+      echo "::error:: Using Gemini requires authentication. You must provide EITHER 'gemini-api-key' OR both 'google-cloud-project' and 'google-cloud-location' (for Vertex AI)."
+      exit 1
+    fi
   fi
 fi
 
