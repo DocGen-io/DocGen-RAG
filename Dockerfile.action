@@ -1,0 +1,35 @@
+# Dockerfile.action
+FROM python:3.11-slim
+
+WORKDIR /docgen
+
+ENV PYTHONPATH=/docgen
+ENV UV_PROJECT_ENVIRONMENT=/docgen/.venv
+ENV PATH="$UV_PROJECT_ENVIRONMENT/bin:$PATH"
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv package manager
+RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/usr/local/bin" sh
+
+# Copy UV dependency files first for layer caching
+COPY pyproject.toml uv.lock ./
+
+# Sync dependencies (frozen ensures lockfile integrity)
+RUN uv sync --no-dev --no-install-project --frozen
+
+# Copy the actual RAG codebase
+COPY src/ src/
+COPY queries/ queries/
+COPY prompts/ prompts/
+
+# Copy logic for the Github Action lifecycle
+COPY action-entrypoint.sh /action-entrypoint.sh
+RUN chmod +x /action-entrypoint.sh
+
+ENTRYPOINT ["/action-entrypoint.sh"]
