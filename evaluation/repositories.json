@@ -69,10 +69,18 @@
         },
         "repos": [
             {
+                "documentation": {
+                    "origin": "local",
+                    "path": "asp-net-core-example-1.json"
+                },
                 "uses": "ASP.NET Core example 1",
                 "repo_url": "https://github.com/gothinkster/aspnetcore-realworld-example-app"
             },
             {
+                "documentation": {
+                    "origin": "local",
+                    "path": "aspnetcore_realworld_example_app.json"
+                },
                 "uses": "ASP.NET Core example 2",
                 "repo_url": "https://github.com/TomislavVinkovic/realworld-api-asp-net-10"
             }
