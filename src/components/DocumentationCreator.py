@@ -14,6 +14,7 @@ from prompts import doc_creator_system_prompt, doc_creator_user_prompt
 from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
 from src.utils.definitions import API_METHODS
 from src.utils.weaviateStore import WeaviateStore, resolve_weaviate_url
+from src.utils.naming_strategy import NamingStrategyFactory
 
 logger = DocGenLogger(__name__)
 
@@ -171,9 +172,12 @@ class DocumentationCreator:
                 documentation = LLMJsonHandler.parse_with_retry(generator=self.generator, prompt=prompt,max_retries=3)
                 
                 if documentation:
-                    method_name = method_info.get("method_name", "unknown")
-                    saved_files = self._save_outputs(method_name, documentation, method_info)
-                    output_files[method_name] = saved_files
+                    strategy = NamingStrategyFactory.get_strategy(endpoint_id, meta)
+                    safe_name = strategy.generate_name(endpoint_id, method_info, meta)
+                    
+                    saved_files = self._save_outputs(safe_name, documentation, method_info)
+                    output_files[safe_name] = saved_files
+                        
                     methods_processed += 1
                 else:
                     logger.error(f"Failed to generate docs for {endpoint_id}")
