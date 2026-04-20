@@ -157,3 +157,31 @@ class TestEmptySchemaStripping:
         assert "content" in result
         items = result["content"]["application/json"]["schema"].get("items", {})
         assert "TopPlayerStatDto" in items.get("description", "")
+
+
+class TestTrailingSlashNormalization:
+    """Trailing slashes should be stripped to prevent /users/ vs /users duplicates."""
+
+    def test_trailing_slash_stripped(self, builder):
+        assert builder._normalize_path("/users/") == "/users"
+
+    def test_root_slash_preserved(self, builder):
+        assert builder._normalize_path("/") == "/"
+
+    def test_no_trailing_slash_unchanged(self, builder):
+        assert builder._normalize_path("/users") == "/users"
+
+    def test_trailing_slash_with_params(self, builder):
+        assert builder._normalize_path("/articles/:slug/") == "/articles/{slug}"
+
+    def test_duplicate_paths_deduplicated_in_build(self, builder):
+        """Two endpoints with /users and /users/ should merge into one path."""
+        endpoints = [
+            {"http_method": "GET", "method_name": "listUsers", "data": {"path": "/users", "summary": "List users", "responses": {"200": {"description": "OK"}}}},
+            {"http_method": "POST", "method_name": "createUser", "data": {"path": "/users/", "summary": "Create user", "responses": {"201": {"description": "Created"}}}},
+        ]
+        spec = builder.build(endpoints)
+        assert "/users" in spec["paths"]
+        assert "/users/" not in spec["paths"]
+        assert "get" in spec["paths"]["/users"]
+        assert "post" in spec["paths"]["/users"]
