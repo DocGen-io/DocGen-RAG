@@ -84,6 +84,9 @@ class SwaggerBuilder(OutputFormatBuilder):
         if not path:
             return "/"
         path = path if path.startswith("/") else f"/{path}"
+        # Strip trailing slash (but keep "/" itself)
+        if len(path) > 1:
+            path = path.rstrip("/")
         # Convert Express-style :param to OpenAPI {param}
         return re.sub(r':([a-zA-Z_][a-zA-Z0-9_]*)', r'{\1}', path)
     
