@@ -105,13 +105,15 @@ class EvaluationOrchestrator:
 def main():
     parser = argparse.ArgumentParser(description="Run automated thesis evaluation harness")
     parser.add_argument("--model", type=str, default=None, help="Name of the model being evaluated")
-    parser.add_argument("--config", type=str, default="evaluation/repositories.json", help="Path to repositories JSON configuration")
+    parser.add_argument("--config_path", type=str, default="config.yaml", help="Path to config.yaml")
+    parser.add_argument("--repositories_file", type=str, default="evaluation/repositories.json", help="Path to repositories JSON configuration")
     parser.add_argument("--output", type=str, default="evaluation/data/evaluation_results.csv", help="Output file path for evaluation metrics CSV")
     parser.add_argument("--description", type=str, default="", help="Description of the evaluation")
     args = parser.parse_args()
     
     orchestrator = EvaluationOrchestrator(
-        repositories_file=args.config,
+        repositories_file=args.repositories_file,
+        config_path=args.config_path,
         output_file=args.output,
         model_name=args.model,
         description=args.description
