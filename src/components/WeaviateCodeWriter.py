@@ -68,6 +68,7 @@ class WeaviateCodeWriter:
 
             meta = {
                 "type": file_type,
+                "doc_type": "code",
                 "node_id": node_id,
                 "name": ep.get("method_name", ""),
                 "class_name": ep.get("class_name", ""),

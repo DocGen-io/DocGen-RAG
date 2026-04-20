@@ -23,14 +23,6 @@
                 "repo_url": "https://github.com/neo4j-examples/nestjs-neo4j-realworld-example"
             },
             {
-                "documentation": {
-                    "origin": "local",
-                    "path": "nestjs_microrm.json"
-                },
-                "uses": "NestJS + MikroORM",
-                "repo_url": "https://github.com/mikro-orm/nestjs-realworld-example-app"
-            },
-            {
                 "uses": "NestJS + TypeORM",
                 "repo_url": "https://github.com/lujakob/nestjs-realworld-example-app"
             }
@@ -54,10 +46,6 @@
             {
                 "uses": "Spring Boot + Spring Data JPA + PostgreSQL",
                 "repo_url": "https://github.com/marcusmonteirodesouza/realworld-backend-spring-boot-java-keycloak-postgresql"
-            },
-            {
-                "uses": "Spring Boot + WebFlux + MongoDB",
-                "repo_url": "https://github.com/a-mountain/realworld-spring-webflux"
             }
         ]
     },
@@ -69,10 +57,18 @@
         },
         "repos": [
             {
+                "documentation": {
+                    "origin": "local",
+                    "path": "asp-net-core-example-1.json"
+                },
                 "uses": "ASP.NET Core example 1",
                 "repo_url": "https://github.com/gothinkster/aspnetcore-realworld-example-app"
             },
             {
+                "documentation": {
+                    "origin": "local",
+                    "path": "aspnetcore_realworld_example_app.json"
+                },
                 "uses": "ASP.NET Core example 2",
                 "repo_url": "https://github.com/TomislavVinkovic/realworld-api-asp-net-10"
             }

@@ -84,3 +84,22 @@ class TestDocumentationMerger:
             filters = kwargs["filters"]
             team_condition = next(c for c in filters["conditions"] if c["field"] == "meta.team_id")
             assert team_condition["value"] == "team123"
+
+    def test_merge_filters_by_project_name(self, tmp_path):
+        """Test that project_name from api_details is included in Weaviate filter."""
+        with patch("src.components.DocumentationMerger.load_config") as mock_load, \
+             patch("src.components.DocumentationMerger.WeaviateStore") as mock_store_class:
+
+            mock_load.return_value = {"doc_creator": {"output_dir": str(tmp_path)}}
+            mock_store = MagicMock()
+            mock_store_class.get_store.return_value = mock_store
+            mock_store.filter_documents.return_value = []
+
+            merger = DocumentationMerger()
+            api_details = {"team_id": "team123", "project_name": "my-realworld-app"}
+            merger.run(project_name="my-realworld-app", api_details=api_details)
+
+            args, kwargs = mock_store.filter_documents.call_args
+            filters = kwargs["filters"]
+            project_condition = next(c for c in filters["conditions"] if c["field"] == "meta.project_name")
+            assert project_condition["value"] == "my-realworld-app"

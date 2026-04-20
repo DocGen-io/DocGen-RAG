@@ -28,13 +28,20 @@ def extract_methods(paths: dict) -> set:
     Returns a set of methods in the format "METHOD /path".
     """
     gen_methods_set = {
-        f"{method.upper()} {path}"
+        f"{method.upper()} {normalize_path(path.lower())}"
         for path, methods in paths.items()
         for method in methods.keys()
         if method.lower() != "parameters"
     }
     return gen_methods_set
 
+def normalize_path(p):
+    p = p.rstrip('/')
+    if not p.startswith('/'):
+        p = '/' + p
+    # Replace OpenAPI `{param}` and Express `:param` with "dynamic_param"
+    return re.sub(r"\{.*?\}|:[a-zA-Z0-9_]+", "dynamic_param", p)
+    
 def evaluate_accuracy(generated_swagger: dict, ground_truth_swagger: dict,date: str) -> dict:
     """
     Compares the generated swagger to the ground truth swagger.
@@ -42,15 +49,12 @@ def evaluate_accuracy(generated_swagger: dict, ground_truth_swagger: dict,date: 
     """
     
     # Normalize paths (remove trailing slashes, enforce lowercase for comparison if needed, but usually paths are case-sensitive, just strip trailing slashes)
-    def normalize_path(p):
-        p = p.rstrip('/')
-        if not p.startswith('/'):
-            p = '/' + p
-        return re.sub(r"\{.*?\}", "dynamic_param", p)
+   
 
-    gen_paths = {normalize_path(k): v for k, v in generated_swagger.get("paths", {}).items()}
-    truth_paths = {normalize_path(k): v for k, v in ground_truth_swagger.get("paths", {}).items()}
-    
+    gen_paths = {normalize_path(k.lower()): v for k, v in generated_swagger.get("paths", {}).items()}
+    truth_paths = {normalize_path(k.lower()): v for k, v in ground_truth_swagger.get("paths", {}).items()}
+    print("number of generated paths",len(generated_swagger.get("paths", {}).items()))
+    print("number of truth paths",len(ground_truth_swagger.get("paths", {}).items()))
     generated_paths_set = set(gen_paths.keys())
     truth_paths_set = set(truth_paths.keys())
     
