@@ -98,6 +98,8 @@ class DocumentationMerger:
                 conditions.append({"field": "meta.team_id", "operator": "==", "value": api_details["team_id"]})
             if "job_id" in api_details:
                 conditions.append({"field": "meta.job_id", "operator": "==", "value": api_details["job_id"]})
+            if "project_name" in api_details:
+                conditions.append({"field": "meta.project_name", "operator": "==", "value": api_details["project_name"]})
 
         filters = {
             "operator": "AND",
