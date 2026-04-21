@@ -38,12 +38,12 @@ class QueryPipeline:
     merges/deduplicates by endpoint path+method.
     """
 
-    def __init__(self, config_path: str = "config.yaml"):
+    def __init__(self, config_path: str = "config.yaml", project_name: str | None = None):
         self.config = load_config(config_path)
         rag = self.config.get("rag", {})
 
         self.top_k = rag.get("top_k_retriever", 2)
-        
+        self.project_name = project_name
         provider = EmbedderFactory.create(self.config)
         self.embedder = provider.get_text_embedder()
         self.weaviate_url = resolve_weaviate_url(self.config)
@@ -76,7 +76,7 @@ class QueryPipeline:
             user_id=user_id,
             job_id=job_id,
             team_id=team_id,
-            project_name=project_name,
+            project_name=project_name or self.project_name,
         )
 
         semantic_retriever = WeaviateEmbeddingRetriever(
@@ -107,10 +107,10 @@ class QueryPipeline:
             if key not in seen:
                 seen.add(key)
                 merged.append({
+                    "id": doc.id,
                     "path": doc.meta.get("path", ""),
                     "method": doc.meta.get("method", ""),
                     "summary": doc.meta.get("summary", ""),
-                    "content": doc.meta.get("raw_json") or doc.content or "Content not found!!",
                     "score": doc.score,
                 })
 
@@ -121,9 +121,11 @@ class QueryPipeline:
 def main():
     parser = argparse.ArgumentParser(description="Run query pipeline")
     parser.add_argument("--query", type=str, required=True, help="Query string")
+    parser.add_argument("--project_name", type=str, required=True, help="Project name")
+
     args = parser.parse_args()
     pipeline = QueryPipeline()
-    results = pipeline.run(args.query)
+    results = pipeline.run(args.query, project_name=args.project_name)
     print(json.dumps(results, indent=2))
 
 

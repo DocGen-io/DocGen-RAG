@@ -25,6 +25,7 @@ from src.utils.config_loader import load_config
 from src.utils.logger import DocGenLogger
 from src.utils.rbac_utils import get_project_name
 from src.utils.pipeline_context import PipelineContext
+import socket
 
 
 logger = DocGenLogger(__name__)
@@ -74,7 +75,7 @@ class DocumentationPipeline:
             # Local defaults — ensures RBAC metadata is always written to
             # Weaviate so that downstream filter queries don't crash on
             # missing properties.
-            import socket
+      
             if not self.ctx.job_id:
                 self.ctx.job_id = project_name
             if not self.ctx.user_id:
