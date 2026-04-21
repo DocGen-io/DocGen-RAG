@@ -50,13 +50,21 @@ class EndpointService:
                     method = data.get("method", "get").lower()
                     
                     if path:
-                        if path not in paths:
-                            paths[path] = {}
+                        doc_id_str = str(doc.id)
+                        if doc_id_str not in paths:
+                            paths[doc_id_str] = {}
+                        
+                        lightweight_data = {
+                            "summary": data.get("summary", ""),
+                            "operationId": data.get("operationId", ""),
+                            "path": path,
+                            "method": method.upper()
+                        }
                         
                         # Inject node_id using standard utility
-                        data = extract_and_inject_node_id(doc, data, default_path=path, default_method=method.upper())
+                        lightweight_data = extract_and_inject_node_id(doc, lightweight_data, default_path=path, default_method=method.upper())
                             
-                        paths[path][method] = data
+                        paths[doc_id_str][method] = lightweight_data
                 except Exception as e:
                     logger.warning(f"Failed to parse raw_json for document {doc.id}: {e}")
                     continue
@@ -100,3 +108,5 @@ class EndpointService:
             except Exception as e:
                 logger.error(f"Failed to fetch endpoint from Weaviate: {e}")
                 return None
+
+
