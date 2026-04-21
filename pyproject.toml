@@ -32,6 +32,8 @@ dependencies = [
     "scikit-learn",
     "numpy",
     "openapi-spec-validator",
+    "ragas>=0.4.3",
+    "google-vertex-haystack>=5.3.0.post1",
 ]
 
 [project.scripts]
@@ -49,3 +51,10 @@ packages = {find = {where = ["."]}}
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[project.optional-dependencies]
+eval = [
+    "langchain>=0.2.0",
+    "langchain-google-genai>=1.0.0",
+    "langchain-community>=0.2.0"
+]
