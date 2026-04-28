@@ -35,6 +35,21 @@ DocGen-RAG is an AI-powered tool designed to automatically generate comprehensiv
     pip install . --use-feature=in-tree-build
     ```
 
+## Interactive CLI
+
+We now provide an interactive CLI tool (`docgen`) to automatically generate documentation for any provided git repository. It handles dependencies and Weaviate startup in the background.
+
+To install it globally to your system PATH, safely run the install script from the repository root:
+```bash
+chmod +x install.sh
+./install.sh
+```
+
+You can now trigger the prompt anywhere simply by typing:
+```bash
+docgen
+```
+
 ## Configuration
 
 Configuration is managed via `settings.yml` and environment variables.
