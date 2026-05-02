@@ -1,0 +1,66 @@
+# DocGen CLI Default Settings
+# Override these in ~/.config/docgen/settings.toml or via DOCGEN_ env vars.
+
+active_provider = "gemini"
+
+# General Settings
+WEAVIATE_URL = "http://127.0.0.1:8080"
+tracing = true
+phoenix_data_dir = "~/.phoenix_data"
+
+api_frameworks = ["NestJS", "SpringBoot", ".NET"]
+languages = ["typescript", "java", "c_sharp"]
+
+[rag]
+active_embedder = "gemini"
+embedding_model = "gemini-2.5-flash-lite"
+top_k_retriever = 2
+top_k_reranker = 2
+chunk_size = 500
+
+[code_analyzer]
+active_generator = "gemini"
+analyzer_output_path = "analyzer_output"
+dependency_search_top_k = 100
+
+[doc_creator]
+active_generator = "gemini"
+output_dir = "output"
+
+[query_generator]
+active_generator = "gemini"
+
+[doc_merger]
+api_title = "API Documentation"
+api_version = "1.0.0"
+api_description = "Auto-generated REST API documentation"
+base_url = "http://localhost:3000"
+
+[app]
+environment = "development"
+
+[generators.gemini]
+model = "gemini-2.5-flash-lite"
+max_tokens = 8192
+
+[generators.ollama]
+model = "qwen2.5-coder:3b"
+url = "http://127.0.0.1:11434"
+max_tokens = 8192
+
+[generators.openai]
+model = "gpt-4o"
+max_tokens = 8192
+
+[ast_extractor]
+verbose = true
+save_ast = true
+save_ast_path = "analyzer_output/ast"
+
+[queries]
+general = "queries/general"
+controllers = "queries/controllers-extractors"
+
+[docker]
+compose_file = "docker-compose.yaml"
+volume_name = "docgen-data"
