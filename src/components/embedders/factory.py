@@ -3,10 +3,12 @@ from src.components.embedders.base_provider import EmbedderProvider
 from src.components.embedders.gemini_provider import GeminiEmbedderProvider
 from src.components.embedders.ollama_provider import OllamaEmbedderProvider
 from src.utils.config_loader import get_config_value
+
+
 class EmbedderFactory:
     _providers: Dict[str, Type[EmbedderProvider]] = {
         "gemini": GeminiEmbedderProvider,
-        "ollama": OllamaEmbedderProvider
+        "ollama": OllamaEmbedderProvider,
     }
 
     @classmethod
@@ -27,3 +29,11 @@ class EmbedderFactory:
             raise ValueError(f"Unknown embedder provider: '{provider_name}'. Available options: {keys}")
         
         return provider_class(config)
+
+
+# Register OpenAI only if its haystack integration is installed
+try:
+    from src.components.embedders.openai_provider import OpenAIEmbedderProvider
+    EmbedderFactory.register_provider("openai", OpenAIEmbedderProvider)
+except ImportError:
+    pass
