@@ -94,10 +94,11 @@ class DocumentationMerger:
         ]
         
         if api_details:
+            from src.utils.rbac_utils import to_uuid
             if "team_id" in api_details:
-                conditions.append({"field": "meta.team_id", "operator": "==", "value": api_details["team_id"]})
+                conditions.append({"field": "meta.team_id", "operator": "==", "value": to_uuid(api_details["team_id"])})
             if "job_id" in api_details:
-                conditions.append({"field": "meta.job_id", "operator": "==", "value": api_details["job_id"]})
+                conditions.append({"field": "meta.job_id", "operator": "==", "value": to_uuid(api_details["job_id"])})
             if "project_name" in api_details:
                 conditions.append({"field": "meta.project_name", "operator": "==", "value": api_details["project_name"]})
 

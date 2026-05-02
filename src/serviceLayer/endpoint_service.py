@@ -1,6 +1,7 @@
 import json
 from typing import Dict, Any, List, Optional
 from src.utils.weaviate_utils import get_weaviate_store, extract_and_inject_node_id
+from src.utils.rbac_utils import to_uuid
 from src.utils.logger import DocGenLogger
 
 logger = DocGenLogger(__name__)
@@ -27,7 +28,7 @@ class EndpointService:
                 "conditions": [
                     {"field": "meta.doc_type", "operator": "==", "value": "endpoint_documentation"},
                     {"field": "meta.project_name", "operator": "==", "value": project_name},
-                    {"field": "meta.team_id", "operator": "==", "value": team_id}
+                    {"field": "meta.team_id", "operator": "==", "value": to_uuid(team_id)}
                 ]
             }
             
@@ -84,7 +85,7 @@ class EndpointService:
                 "conditions": [
                     {"field": "meta.doc_type", "operator": "==", "value": "endpoint_documentation"},
                     {"field": "meta.project_name", "operator": "==", "value": project_name},
-                    {"field": "meta.team_id", "operator": "==", "value": team_id},
+                    {"field": "meta.team_id", "operator": "==", "value": to_uuid(team_id)},
                     {"field": "meta.path", "operator": "==", "value": path},
                     {"field": "meta.method", "operator": "==", "value": method.lower()}
                 ]
