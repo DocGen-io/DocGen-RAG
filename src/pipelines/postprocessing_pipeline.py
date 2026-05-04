@@ -13,6 +13,8 @@ from src.components.FetchExampleGenerator import FetchExampleGenerator
 from src.utils.config_loader import load_config
 from src.utils.logger import DocGenLogger
 
+from src.utils.weaviateStore import resolve_weaviate_url
+
 logger = DocGenLogger(__name__)
 
 
@@ -25,7 +27,7 @@ class PostprocessingPipeline:
 
     def __init__(self, config_path: str = "config.yaml"):
         config = load_config(config_path)
-        weaviate_url = config.get("WEAVIATE_URL") or "http://127.0.0.1:8080"
+        weaviate_url = resolve_weaviate_url(config)
 
         self._clusterer = EndpointClusterer(weaviate_url=weaviate_url, config_path=config_path)
         self._example_gen = FetchExampleGenerator(config_path=config_path)

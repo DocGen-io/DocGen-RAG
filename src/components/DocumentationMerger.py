@@ -41,7 +41,7 @@ class DocumentationMerger:
             config_path: Path to configuration file
         """
         self.config = load_config(config_path)
-        weaviate_url = resolve_weaviate_url(self.config)
+        weaviate_url = resolve_weaviate_url()
         self.store = WeaviateStore.get_store(url=weaviate_url)
         
         # Get merger-specific config with defaults
@@ -94,11 +94,10 @@ class DocumentationMerger:
         ]
         
         if api_details:
-            from src.utils.rbac_utils import to_uuid
             if "team_id" in api_details:
-                conditions.append({"field": "meta.team_id", "operator": "==", "value": to_uuid(api_details["team_id"])})
+                conditions.append({"field": "meta.team_id", "operator": "==", "value": api_details["team_id"]})
             if "job_id" in api_details:
-                conditions.append({"field": "meta.job_id", "operator": "==", "value": to_uuid(api_details["job_id"])})
+                conditions.append({"field": "meta.job_id", "operator": "==", "value": api_details["job_id"]})
             if "project_name" in api_details:
                 conditions.append({"field": "meta.project_name", "operator": "==", "value": api_details["project_name"]})
 

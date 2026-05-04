@@ -4,22 +4,15 @@ from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_WEAVIATE_URL = "http://127.0.0.1:8080"
+DEFAULT_WEAVIATE_URL = "http://localhost:8080"
 
 
-def resolve_weaviate_url(config: dict) -> str:
+def resolve_weaviate_url(config: dict = None) -> str:
     """
-    Resolve the Weaviate URL from a config dict.
-
-    Handles three failure modes:
-      1. Key missing entirely  ->  returns default
-      2. Key present but empty string (env var not set)  ->  returns default
-      3. Key holds an unexpanded placeholder like "${WEAVIATE_URL}"  ->  returns default
+    Resolve the Weaviate URL strictly from environment variables.
+    The 'config' parameter is kept for backward compatibility but ignored.
     """
-    raw = config.get("WEAVIATE_URL", "")
-    if not raw or raw.startswith("${"):
-        return DEFAULT_WEAVIATE_URL
-    return raw
+    return os.getenv("WEAVIATE_URL") or DEFAULT_WEAVIATE_URL
 
 
 class WeaviateStore:

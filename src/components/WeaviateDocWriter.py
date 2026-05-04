@@ -35,7 +35,7 @@ class WeaviateDocWriter:
 
     def __init__(self, config_path: str = "config.yaml"):
         config = load_config(config_path)
-        weaviate_url = resolve_weaviate_url(config)
+        weaviate_url = resolve_weaviate_url()
         self.store = WeaviateStore.get_store(url=weaviate_url)
         provider = EmbedderFactory.create(config)
         self.embedder = provider.get_document_embedder()

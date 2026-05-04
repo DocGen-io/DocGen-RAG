@@ -39,7 +39,7 @@ class EndpointClusterer:
         config_path: str = "config.yaml"
     ):
         self.config = load_config(config_path)
-        weaviate_url = resolve_weaviate_url(self.config)
+        weaviate_url = resolve_weaviate_url()
         self.store = WeaviateStore.get_store(url=weaviate_url)
         self.n_clusters = self.config.get("endpoint_clusterer", {}).get("n_clusters", "auto")
         
@@ -158,8 +158,7 @@ class EndpointClusterer:
             
             conditions = [{"field": "meta.doc_type", "operator": "==", "value": "endpoint_documentation"}]
             if team_id:
-                from src.utils.rbac_utils import to_uuid
-                conditions.append({"field": "meta.team_id", "operator": "==", "value": to_uuid(team_id)})
+                conditions.append({"field": "meta.team_id", "operator": "==", "value": team_id})
             if project_name:
                 conditions.append({"field": "meta.project_name", "operator": "==", "value": project_name})
             

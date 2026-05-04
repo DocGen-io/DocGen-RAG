@@ -30,7 +30,7 @@ class DocumentationCreator:
     
     def __init__(self, config_path: str = "config.yaml"):
         self.config = load_config(config_path)
-        weaviate_url = resolve_weaviate_url(self.config)
+        weaviate_url = resolve_weaviate_url()
         self.store = WeaviateStore.get_store(url=weaviate_url)
         self.generator = ModelGenerator("doc_creator", config_path).get_generator()
         self.output_dir = self.config.get("doc_creator", {}).get("output_dir", "output")

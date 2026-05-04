@@ -53,4 +53,3 @@ rag:
   top_k_reranker: 2
   top_k_retriever: 2
 tracing: true
-weaviate_url: http://127.0.0.1:8080
