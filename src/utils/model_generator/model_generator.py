@@ -13,13 +13,6 @@ PROVIDER_REGISTRY: Dict[str, BaseProvider] = {
     "gemini": GeminiProvider(),
 }
 
-# Register OpenAI only if its haystack integration is installed
-try:
-    from .openai_provider import OpenAIProvider
-    PROVIDER_REGISTRY["openai"] = OpenAIProvider()
-except ImportError:
-    pass
-
 class ModelGenerator:
     """
     Factory for creating LLM generators from config.yaml.

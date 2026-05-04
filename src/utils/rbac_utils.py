@@ -38,11 +38,11 @@ def build_rbac_filters(
     conditions = []
     
     if user_id:
-        conditions.append({"field": "meta.user_id", "operator": "==", "value": to_uuid(user_id)})
+        conditions.append({"field": "meta.user_id", "operator": "==", "value": user_id})
     if team_id:
-        conditions.append({"field": "meta.team_id", "operator": "==", "value": to_uuid(team_id)})
+        conditions.append({"field": "meta.team_id", "operator": "==", "value": team_id})
     if job_id:
-        conditions.append({"field": "meta.job_id", "operator": "==", "value": to_uuid(job_id)})
+        conditions.append({"field": "meta.job_id", "operator": "==", "value": job_id})
     if project_name:
         conditions.append({"field": "meta.project_name", "operator": "==", "value": project_name})
         
@@ -58,23 +58,6 @@ def build_rbac_filters(
     if len(conditions) == 1:
         return conditions[0]
     return {"operator": "AND", "conditions": conditions}
-
-import uuid
-
-def to_uuid(value: str) -> str:
-    """
-    Ensure a string is a valid UUID. If not, generate a stable UUID v5 from it.
-    This is necessary because Weaviate property 'uuid' types strictly require UUID format.
-    """
-    if not value:
-        return value
-    try:
-        # Check if already a valid UUID
-        uuid.UUID(value)
-        return value
-    except ValueError:
-        # Generate stable UUID from string using a fixed namespace (DNS namespace is a safe default)
-        return str(uuid.uuid5(uuid.NAMESPACE_DNS, value))
 
 def apply_rbac_metadata(
     meta: Dict[str, Any],
@@ -95,11 +78,11 @@ def apply_rbac_metadata(
     auth_tags = [user_id, job_id, team_id, project_name]
     
     if user_id:
-        meta["user_id"] = to_uuid(user_id)
+        meta["user_id"] = user_id
     if team_id:
-        meta["team_id"] = to_uuid(team_id)
+        meta["team_id"] = team_id
     if job_id:
-        meta["job_id"] = to_uuid(job_id)
+        meta["job_id"] = job_id
     if project_name:
         meta["project_name"] = project_name
         

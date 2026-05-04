@@ -30,11 +30,10 @@ class GeminiProvider(BaseProvider):
         elif "response_mime_type" not in gen_kwargs:
             gen_kwargs["response_mime_type"] = "text/plain"
 
-        import os
         return GoogleGenAIChatGenerator(
             api="vertex",
-            vertex_ai_project=settings.get("project_id") or os.environ.get("GOOGLE_CLOUD_PROJECT"),
-            vertex_ai_location=settings.get("location") or os.environ.get("GOOGLE_CLOUD_LOCATION"),
+            vertex_ai_project=settings.get("project_id"),
+            vertex_ai_location=settings.get("location"),
             model=settings.get("model"),
             generation_kwargs=gen_kwargs,
         )
