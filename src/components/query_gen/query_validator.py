@@ -82,7 +82,7 @@ class QueryValidator:
         is_valid = len(errors) == 0
 
         if is_valid:
-            logger.info(
+            logger.debug(
                 "All queries passed validation",
                 location="QueryValidator.run",
             )
@@ -213,7 +213,7 @@ class QueryValidator:
 
 
         if not errs:
-            logger.info(
+            logger.debug(
                 f"[{query_type}] Semantic check passed: "
                 f"{total_matches} match(es), captures: "
                 f"{', '.join(sorted('@' + c for c in found_captures))}",

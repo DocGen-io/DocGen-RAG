@@ -72,7 +72,7 @@ class EndpointClusterer:
                 
                 cluster_name = response.get("cluster_name", f"Group {cid + 1}")
                 named_clusters[cluster_name] = endpoints
-                logger.info(f"Cluster {cid} named: '{cluster_name}'")
+                logger.debug(f"Cluster {cid} named: '{cluster_name}'")
                 
             except Exception as e:
                 logger.warning(f"Failed to name cluster {cid}: {e}. Using fallback.")
@@ -108,13 +108,13 @@ class EndpointClusterer:
                     
                     if len(set(labels)) > 1 and len(set(labels)) < n_samples:
                         score = davies_bouldin_score(embeddings, labels)
-                        logger.info(f"Evaluated K={k}: Davies-Bouldin Score = {score:.4f} (lower is better)")
+                        logger.debug(f"Evaluated K={k}: Davies-Bouldin Score = {score:.4f} (lower is better)")
                         if score < best_score:
                             best_score = score
                             best_k = k
                             best_labels = labels
                 
-                logger.info(f"Auto-selected optimal cluster count: {best_k} (Davies-Bouldin Score: {best_score:.4f})")
+                logger.debug(f"Auto-selected optimal cluster count: {best_k} (Davies-Bouldin Score: {best_score:.4f})")
             
             n_clusters = best_k
             labels = best_labels if best_labels is not None else ([0] * n_samples)
@@ -237,9 +237,9 @@ def main():
     clusters = results.get("clusters", {})
     
     for name, endpoints in clusters.items():
-        print(f"\nGroup: {name} ({len(endpoints)} endpoints)")
+        logger.debug(f"\nGroup: {name} ({len(endpoints)} endpoints)")
         for ep in endpoints:
-            print(f"  - {ep['method'].upper()} {ep['path']} ({ep['summary']})")
+            logger.debug(f"  - {ep['method'].upper()} {ep['path']} ({ep['summary']})")
 
 
 if __name__ == "__main__":

@@ -125,4 +125,4 @@ def main():
     
     examples = generator.run(swagger_data)
     
-    logger.info(examples)
+    logger.debug(examples)

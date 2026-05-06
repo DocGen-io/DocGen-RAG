@@ -89,7 +89,7 @@ class DraftParser:
                 "file_type": file_type
             })
 
-            logger.info(
+            logger.debug(
                 f"Parsed AST for draft {fname} ({len(ast_sexp)} chars)",
                 location="DraftParser.run",
             )
