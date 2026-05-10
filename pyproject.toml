@@ -58,7 +58,6 @@ testpaths = ["tests"]
 eval = [
     "langchain>=0.2.0",
     "langchain-google-genai>=1.0.0",
-<<<<<<< HEAD
     "langchain-community>=0.2.0",
 ]
 cli = [
@@ -67,7 +66,4 @@ cli = [
     "questionary>=2.0.0",
     "dynaconf>=3.2.0",
     "keyring>=25.0.0",
-=======
-    "langchain-community>=0.2.0"
->>>>>>> main
 ]
