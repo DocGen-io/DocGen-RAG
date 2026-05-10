@@ -1,3 +1,4 @@
+import os
 from typing import Any, Dict, Optional
 from haystack_integrations.components.generators.ollama import OllamaChatGenerator
 from .base_provider import BaseProvider
@@ -25,6 +26,6 @@ class OllamaProvider(BaseProvider):
 
         return OllamaChatGenerator(
             model=settings.get("model"),
-            url=settings.get("url"),
+            url=settings.get("url") or os.environ.get("OLLAMA_URL") or "http://127.0.0.1:11434",
             generation_kwargs=gen_kwargs,
         )
