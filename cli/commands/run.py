@@ -158,6 +158,23 @@ def run_pipeline(
         console.print_success(
             f"Pipeline completed. {files} files processed, {endpoints} endpoints found."
         )
+        swagger_path = result.get("swagger_path")
+        if swagger_path:
+            abs_path = os.path.abspath(swagger_path)
+            console.console.print(
+                f"\n  [bold green]Swagger API Specification generated successfully![/bold green]"
+            )
+            console.console.print(
+                f"  Click to access: [link=file://{abs_path}]file://{abs_path}[/link]\n",
+                style="bold cyan"
+            )
+            try:
+                if console.confirm("Would you like to open the generated Swagger JSON file in your default browser?", default=False):
+                    import webbrowser
+                    webbrowser.open(f"file://{abs_path}")
+            except Exception:
+                # Fallback gracefully if running in a non-interactive/headless shell
+                pass
     else:
         console.print_error(f"Pipeline failed: {result.get('error', 'unknown error')}")
 
