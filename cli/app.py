@@ -47,6 +47,13 @@ def run(
 
 
 @app.command()
+def outputs() -> None:
+    """List generated Swagger specifications and view/open them."""
+    from cli.commands.outputs import list_outputs
+    list_outputs()
+
+
+@app.command()
 def reboard() -> None:
     """Reset configuration and run the first-time setup wizard again."""
     from cli.commands.config import reset_config
