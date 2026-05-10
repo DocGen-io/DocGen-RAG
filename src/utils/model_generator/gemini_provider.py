@@ -1,3 +1,4 @@
+import os
 from typing import Any, Dict, Optional
 from haystack_integrations.components.generators.google_genai import (
     GoogleGenAIChatGenerator,
@@ -32,8 +33,8 @@ class GeminiProvider(BaseProvider):
 
         return GoogleGenAIChatGenerator(
             api="vertex",
-            vertex_ai_project=settings.get("project_id"),
-            vertex_ai_location=settings.get("location"),
+            vertex_ai_project=settings.get("project_id") or os.environ.get("GOOGLE_CLOUD_PROJECT"),
+            vertex_ai_location=settings.get("location") or os.environ.get("GOOGLE_CLOUD_LOCATION"),
             model=settings.get("model"),
             generation_kwargs=gen_kwargs,
         )

@@ -52,7 +52,7 @@ class QueryWriter:
                 f.write(query_text)
 
             saved.append(out_path)
-            logger.info(
+            logger.debug(
                 f"Saved {query_type} query → {out_path}",
                 location="QueryWriter.run",
             )
@@ -68,7 +68,7 @@ class QueryWriter:
                 out_path = os.path.join(out_dir, filename)
                 with open(out_path, "w", encoding="utf-8") as f:
                     f.write(m_file.get("content", ""))
-                logger.info(
+                logger.debug(
                     f"Saved {file_type} mock/draft file → {out_path}",
                     location="QueryWriter.run",
                 )

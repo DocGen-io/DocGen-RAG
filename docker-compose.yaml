@@ -20,6 +20,8 @@ services:
       CLUSTER_HOSTNAME: 'node1'
     volumes:
       - weaviate_data:/var/lib/weaviate
+      - docgen_data:/docgen/data
 
 volumes:
   weaviate_data:
+  docgen_data:

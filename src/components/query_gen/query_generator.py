@@ -165,14 +165,14 @@ class QueryGenerator:
                 # Deterministic fix: strip invalid field names the LLM invents
                 current_query = sanitize_query_fields(raw, language)
 
-                logger.info(
+                logger.debug(
                     f"Generated partial {query_type} query from "
                     f"{result['filename']} ({len(current_query)} chars)",
                     location="QueryGenerator.run",
                 )
 
             queries[query_type] = current_query
-            logger.info(
+            logger.debug(
                 f"Generated final {query_type} query "
                 f"({len(queries[query_type])} chars)",
                 location="QueryGenerator.run",

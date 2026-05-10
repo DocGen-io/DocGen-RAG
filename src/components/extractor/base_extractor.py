@@ -104,7 +104,7 @@ class BaseASTExtractor:
         file_name = os.path.basename(file_path)
 
         if self.config["verbose"]:
-            self.logger.info(json.dumps(chunks, indent=2), location="handle_extractor_output")
+            self.logger.debug(json.dumps(chunks, indent=2), location="handle_extractor_output")
 
         if self.config["save_ast"]:
             os.makedirs(self.config["save_ast_path"], exist_ok=True)
@@ -114,7 +114,7 @@ class BaseASTExtractor:
             save_name = f"{file_name}.json"
             with open(os.path.join(self.config["save_ast_path"], save_name), "w") as f:
                 json.dump(chunks, f, indent=2)
-            self.logger.info(f"Saved AST to {os.path.join(self.config['save_ast_path'], save_name)}", location="handle_extractor_output")
+            self.logger.debug(f"Saved AST to {os.path.join(self.config['save_ast_path'], save_name)}", location="handle_extractor_output")
 
         records: List[ASTOutputRecord] = []
         for class_info in chunks:

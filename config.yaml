@@ -1,74 +1,58 @@
-# config.yaml
-
-# RAG settings
-rag:
-  active_embedder: "gemini" # Options: gemini, ollama
-  embedding_model: "gemini-2.5-flash-lite"
-  top_k_retriever: 2
-  top_k_reranker: 2
-  chunk_size: 500
-process_grouping_automatically: false
-
-# General Settings
-WEAVIATE_URL: "${WEAVIATE_URL}"
-WEAVIATE_API_KEY: "${WEAVIATE_API_KEY}"
-tracing: true
-phoenix_data_dir: "~/.phoenix_data"
-
-# code mapper settings
-
-code_analyzer:
-  active_generator: "gemini"
-  analyzer_output_path: "analyzer_output"
-  dependency_search_top_k: 100
-
-generators:
-  ollama:
-    url: "http://127.0.0.1:11434"
-    api_key: ""
-    # model: "qwen3.5:4b"
-    # model: "llama3"
-    model: "qwen2.5-coder:3b"
-    max_tokens: 8192
-  gemini:
-    project_id: ${GOOGLE_CLOUD_PROJECT}
-    location: ${GOOGLE_CLOUD_LOCATION}
-    model: "gemini-2.5-flash-lite"
-    # model: "gemini-2.5-pro"
-    max_tokens: 8192
-
-# Documentation Creator settings
-doc_creator:
-  active_generator: "gemini"
-  output_dir: "output"
-
-# Documentation Merger settings
-doc_merger:
-  api_title: "API Documentation"
-  api_version: "1.0.0"
-  api_description: "Auto-generated REST API documentation"
-  base_url: "http://localhost:3000"
-
-# App settings
+active_provider: gemini
+api_frameworks:
+- NestJS
+- SpringBoot
+- .NET
 app:
-  environment: "development"
-
-# Query Generator settings
-query_generator:
-  active_generator: "gemini"
-
-# AST Extractor settings
+  environment: development
 ast_extractor:
   save_ast: true
-  save_ast_path: "analyzer_output/ast"
-  verbose: false
-
-# Tree-sitter query paths
+  save_ast_path: analyzer_output/ast
+  verbose: true
+code_analyzer:
+  active_generator: gemini
+  analyzer_output_path: analyzer_output
+  dependency_search_top_k: 100
+doc_creator:
+  active_generator: gemini
+  output_dir: output
+doc_merger:
+  api_description: Auto-generated REST API documentation
+  api_title: API Documentation
+  api_version: 1.0.0
+  base_url: http://localhost:3000
+docker:
+  compose_file: docker-compose.yaml
+  volume_name: docgen-data
+generators:
+  gemini:
+    location: europe-west4
+    max_tokens: 8192
+    model: gemini-2.5-flash-lite
+    project_id: project-f7cc037a-3694-4143-a21
+  ollama:
+    max_tokens: 8192
+    model: qwen2.5-coder:3b
+    url: http://127.0.0.1:11434
+  openai:
+    max_tokens: 8192
+    model: gpt-4o
+languages:
+- typescript
+- java
+- c_sharp
+load_dotenv: false
+phoenix_data_dir: ~/.phoenix_data
 queries:
-  general: "queries/general"
-  controllers: "queries/controllers-extractors"
-  generated: "queries/generated"
-
-# API frameworks supported for documentation
-api_frameworks: ["NestJS", "SpringBoot", ".NET"]
-languages: ["typescript", "java", "c_sharp"]
+  controllers: queries/controllers-extractors
+  general: queries/general
+query_generator:
+  active_generator: gemini
+rag:
+  active_embedder: gemini
+  chunk_size: 500
+  embedding_model: gemini-2.5-flash-lite
+  top_k_reranker: 2
+  top_k_retriever: 2
+tracing: true
+weaviate_url: http://127.0.0.1:8080

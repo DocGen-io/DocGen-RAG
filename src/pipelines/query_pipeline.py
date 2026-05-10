@@ -38,7 +38,11 @@ class QueryPipeline:
     merges/deduplicates by endpoint path+method.
     """
 
-    def __init__(self, config_path: str = "config.yaml", project_name: str | None = None):
+    def __init__(
+        self, 
+        config_path: str = "config.yaml", 
+        project_name: str | None = None
+    ):
         self.config = load_config(config_path)
         rag = self.config.get("rag", {})
 
@@ -46,7 +50,8 @@ class QueryPipeline:
         self.project_name = project_name
         provider = EmbedderFactory.create(self.config)
         self.embedder = provider.get_text_embedder()
-        self.weaviate_url = resolve_weaviate_url(self.config)
+        
+        self.weaviate_url = resolve_weaviate_url()
         self.store = WeaviateStore.get_store(url=self.weaviate_url)
 
 

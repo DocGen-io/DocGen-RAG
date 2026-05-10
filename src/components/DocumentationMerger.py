@@ -41,7 +41,7 @@ class DocumentationMerger:
             config_path: Path to configuration file
         """
         self.config = load_config(config_path)
-        weaviate_url = resolve_weaviate_url(self.config)
+        weaviate_url = resolve_weaviate_url()
         self.store = WeaviateStore.get_store(url=weaviate_url)
         
         # Get merger-specific config with defaults

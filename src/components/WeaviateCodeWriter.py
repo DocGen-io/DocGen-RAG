@@ -37,7 +37,7 @@ class WeaviateCodeWriter:
         ctx: Optional[PipelineContext] = None,
     ):
         self.config = load_config(config_path)
-        weaviate_url = resolve_weaviate_url(self.config)
+        weaviate_url = resolve_weaviate_url()
         self.store = WeaviateStore.get_store(url=weaviate_url)
         self.ctx = ctx or PipelineContext()
 

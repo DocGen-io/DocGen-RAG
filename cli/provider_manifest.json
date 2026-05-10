@@ -1,0 +1,27 @@
+{
+  "commit": "d702886664a6db668945293c4308d2ea7ad4654d",
+  "repo": "DocGen-io/DocGen-RAG",
+  "providers": {
+    "gemini": {
+      "embedder": "src/components/embedders/gemini_provider.py",
+      "generator": "src/utils/model_generator/gemini_provider.py",
+      "pip_packages": [
+        "google-genai-haystack"
+      ]
+    },
+    "ollama": {
+      "embedder": "src/components/embedders/ollama_provider.py",
+      "generator": "src/utils/model_generator/ollama_provider.py",
+      "pip_packages": [
+        "ollama-haystack"
+      ]
+    },
+    "openai": {
+      "embedder": "src/components/embedders/openai_provider.py",
+      "generator": "src/utils/model_generator/openai_provider.py",
+      "pip_packages": [
+        "openai-haystack"
+      ]
+    }
+  }
+}

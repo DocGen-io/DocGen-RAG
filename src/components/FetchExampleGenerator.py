@@ -28,13 +28,11 @@ class FetchExampleGenerator:
     Not part of the main pipeline — called on demand.
     """
 
-    def __init__(self, config_path: str = "config.yaml", weaviate_url: Optional[str] = None):
+    def __init__(self, config_path: str = "config.yaml"):
         config = load_config(config_path)
-        self.weaviate_url = weaviate_url or config.get("weaviate", {}).get("url", "http://localhost:8080")
+        from src.utils.weaviateStore import resolve_weaviate_url
+        self.weaviate_url = resolve_weaviate_url()
         
-        gen_section = config.get("fetch_example_generator", {}).get(
-            "active_generator", config.get("doc_creator", {}).get("active_generator", "ollama")
-        )
         # Reuse doc_creator config if no dedicated section exists
         llm_type = "fetch_example_generator" if "fetch_example_generator" in config else "doc_creator"
         self.generator = ModelGenerator(llm_type, config_path).get_generator()
@@ -127,4 +125,4 @@ def main():
     
     examples = generator.run(swagger_data)
     
-    logger.info(examples)
+    logger.debug(examples)

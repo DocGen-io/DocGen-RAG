@@ -54,7 +54,7 @@ class ASTQueryExtractor:
                 }
             )
 
-            logger.info(
+            logger.debug(
                 f"Parsed AST for {filename} ({len(ast_sexp)} chars)",
                 location="ASTQueryExtractor.run",
             )

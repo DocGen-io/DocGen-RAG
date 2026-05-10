@@ -145,7 +145,7 @@ def fetch_by_node_id(
 from contextlib import contextmanager
 
 @contextmanager
-def get_weaviate_store(url: str = "http://127.0.0.1:8080", **kwargs):
+def get_weaviate_store(url: str = "http://localhost:8080", **kwargs):
     """
     Context manager to initialize and automatically close WeaviateDocumentStore.
     Produces DRY, reliable connection handling.

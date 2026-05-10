@@ -68,7 +68,7 @@ class MicroSnippetGenerator:
                 f"LLM returned no micro-snippets for {framework_name}/{language}"
             )
 
-        logger.info(
+        logger.debug(
             f"Generated {len(snippets)} micro-snippets for {framework_name}/{language}",
             location="MicroSnippetGenerator.run",
         )

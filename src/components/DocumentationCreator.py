@@ -30,7 +30,7 @@ class DocumentationCreator:
     
     def __init__(self, config_path: str = "config.yaml"):
         self.config = load_config(config_path)
-        weaviate_url = resolve_weaviate_url(self.config)
+        weaviate_url = resolve_weaviate_url()
         self.store = WeaviateStore.get_store(url=weaviate_url)
         self.generator = ModelGenerator("doc_creator", config_path).get_generator()
         self.output_dir = self.config.get("doc_creator", {}).get("output_dir", "output")
@@ -47,7 +47,7 @@ class DocumentationCreator:
             
             if docs:
                 doc = docs[0]
-                logger.info(f"[WEAVIATE HIT] node_id='{node_id}' content_len={len(doc.content)} meta_keys={list(doc.meta.keys())}")
+                logger.debug(f"[WEAVIATE HIT] node_id='{node_id}' content_len={len(doc.content)} meta_keys={list(doc.meta.keys())}")
                 context_parts.append(f"**{node_id}**:\n{doc.content}\n")
             else:
                 logger.warning(f"[WEAVIATE MISS] node_id='{node_id}' -> no documents found")
@@ -121,17 +121,17 @@ class DocumentationCreator:
             try:
                 # 1. Gather all internal dependencies (excluding the endpoint itself to save tokens)
                 node_ids = [n for n in graph.get_all_nodes() if n != endpoint_id]
-                logger.info(f"[GRAPH] endpoint={endpoint_id} has {len(node_ids)} dependency node(s): {node_ids}")
+                logger.debug(f"[GRAPH] endpoint={endpoint_id} has {len(node_ids)} dependency node(s): {node_ids}")
 
                 # 2. Fetch context from Weaviate for all nodes
                 dep_context = self._fetch_dependency_context(self.store, node_ids)
                 
 
                 # 3. Extract the endpoint method's details from Weaviate to guide the prompt
-                logger.info(f"[WEAVIATE QUERY] fetch endpoint doc: '{endpoint_id}'")
+                logger.debug(f"[WEAVIATE QUERY] fetch endpoint doc: '{endpoint_id}'")
                 
                 endpoint_doc_list = fetch_by_node_id(self.store, endpoint_id)
-                logger.info(f"[WEAVIATE RESULT] endpoint='{endpoint_id}' -> {len(endpoint_doc_list)} doc(s)")
+                logger.debug(f"[WEAVIATE RESULT] endpoint='{endpoint_id}' -> {len(endpoint_doc_list)} doc(s)")
 
                 if not endpoint_doc_list:
                     logger.error(f"Endpoint {endpoint_id} not found in Weaviate. Skipping.")
@@ -152,7 +152,7 @@ class DocumentationCreator:
                 raw_decorator_type = str(api_details.get("decorator_type", "unknown"))
             
                 if raw_decorator_type.lower()  not in API_METHODS:
-                    logger.info(f"Skipping non-REST method {endpoint_id} of type: {raw_decorator_type}")
+                    logger.debug(f"Skipping non-REST method {endpoint_id} of type: {raw_decorator_type}")
                     # We still count it as 'processed' so it doesn't skew failure metrics, but we don't document it.
                     methods_processed += 1
                     continue
@@ -235,5 +235,5 @@ class DocumentationCreator:
         with open(swagger_path, "w", encoding="utf-8") as f:
             json.dump(swagger_data, f, indent=2)
 
-        logger.info(f"Saved documentation for {method_name} to {method_dir}")
+        logger.debug(f"Saved documentation for {method_name} to {method_dir}")
         return {"swagger": swagger_path}
