@@ -26,8 +26,10 @@ docker:
   volume_name: docgen-data
 generators:
   gemini:
+    location: europe-west4
     max_tokens: 8192
     model: gemini-2.5-flash-lite
+    project_id: project-f7cc037a-3694-4143-a21
   ollama:
     max_tokens: 8192
     model: qwen2.5-coder:3b
@@ -53,3 +55,4 @@ rag:
   top_k_reranker: 2
   top_k_retriever: 2
 tracing: true
+weaviate_url: http://127.0.0.1:8080

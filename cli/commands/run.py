@@ -6,6 +6,7 @@ Usage:
   docgen run <git-url> --background
 """
 
+from dynaconf.base import Settings
 import multiprocessing
 import os
 from pathlib import Path
@@ -14,7 +15,14 @@ from typing import Any
 import yaml
 
 from cli.core import console, secrets
-from cli.core.settings import get_settings, settings_to_config_dict
+from cli.core.settings import (
+    get_settings,
+    settings_to_config_dict,
+    MissingSettingError,
+    save_user_setting,
+    reset_settings,
+)
+from cli.core.config_schemas import REQUIRED_SETTINGS_CONFIG
 
 # Module-level reference that tests can patch via `cli.commands.run.DocumentationPipeline`.
 # Actual class is resolved at call time to avoid heavy imports on module load.
@@ -66,6 +74,46 @@ def inject_credentials() -> dict[str, str]:
     return env_vars
 
 
+# Helper to loop and prompt user for missing settings
+
+
+def loop_missing_settings(e: MissingSettingError, settings: Settings) -> None:
+    """Prompt the user dynamically for a missing setting using REQUIRED_SETTINGS_CONFIG."""
+    config = REQUIRED_SETTINGS_CONFIG.get(e.key)
+    
+    if config:
+        prompt_type = config.get("type", "text")
+        
+        # Resolve dynamic message
+        msg_val = config.get("message")
+        message = msg_val(settings) if callable(msg_val) else msg_val
+        
+        # Prompt based on type
+        if prompt_type == "select":
+            choices_val = config.get("choices", [])
+            choices = choices_val(settings) if callable(choices_val) else choices_val
+            val = console.select(message, choices=choices)
+        else:
+            default_val = config.get("default")
+            default = default_val(settings) if callable(default_val) else default_val
+            val = console.text(message, default=default)
+            
+        error_message = config.get("error_message", f"Value for '{e.key}' is required to continue.")
+    else:
+        # Fallback for unregistered settings
+        message = f"Enter value for '{e.key}':"
+        val = console.text(message)
+        error_message = f"Value for '{e.key}' is required to continue."
+
+    if not val:
+        console.print_error(error_message)
+        raise SystemExit(1)
+        
+    save_user_setting(e.key, val)
+    # Reset settings so they are re-evaluated in the next loop iteration
+    reset_settings()
+
+
 def run_pipeline(
     git_url: str,
     api_dir: str | None = None,
@@ -82,8 +130,14 @@ def run_pipeline(
         console.print_step("Credentials loaded from secure storage.")
 
     # Write legacy config.yaml so existing pipeline code can consume it
-    settings = get_settings()
-    config_dict = settings_to_config_dict(settings)
+    while True:
+        settings = get_settings()
+        try:
+            config_dict = settings_to_config_dict(settings)
+            break
+        except MissingSettingError as e:
+            console.print_warning(f"Missing required configuration: {e}")
+            loop_missing_settings(e, settings)
 
     project_root = Path(__file__).resolve().parent.parent.parent
     config_path = project_root / "config.yaml"

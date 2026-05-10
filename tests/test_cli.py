@@ -301,6 +301,14 @@ class TestConsole:
         mock_q.text.return_value.ask.return_value = "my-project"
         assert text("Project ID:") == "my-project"
 
+    @patch("cli.core.console.questionary")
+    def test_prompt_aborts_on_keyboard_interrupt(self, mock_q):
+        from cli.core.console import text
+        mock_q.text.return_value.ask.side_effect = KeyboardInterrupt()
+        with pytest.raises(SystemExit) as exc_info:
+            text("Test:")
+        assert exc_info.value.code == 1
+
 
 # ---------------------------------------------------------------------------
 # commands/credentials.py
@@ -372,30 +380,31 @@ class TestProviderCommand:
 class TestInitCommand:
     """First-time setup wizard with OAuth."""
 
-    @patch("cli.commands.init.console")
-    @patch("cli.commands.init.secrets")
-    def test_setup_gemini_stores_credentials(self, mock_secrets, mock_console):
+    @patch("cli.core.console.text")
+    @patch("cli.core.console.confirm")
+    @patch("cli.core.secrets.store")
+    def test_setup_gemini_stores_credentials(self, mock_store, mock_confirm, mock_text):
         from cli.commands.init import setup_provider_credentials
-        mock_console.text.side_effect = ["my-project-id", "europe-west4"]
-        mock_console.confirm.return_value = False  # no service account JSON
+        mock_text.side_effect = ["my-project-id", "europe-west4"]
+        mock_confirm.return_value = False  # no service account JSON
         setup_provider_credentials("gemini")
-        assert mock_secrets.store.call_count >= 2  # project_id + location
+        assert mock_store.call_count >= 2  # project_id + location
 
-    @patch("cli.commands.init.console")
-    @patch("cli.commands.init.secrets")
-    def test_setup_openai_stores_api_key(self, mock_secrets, mock_console):
+    @patch("cli.core.console.password")
+    @patch("cli.core.secrets.store")
+    def test_setup_openai_stores_api_key(self, mock_store, mock_password):
         from cli.commands.init import setup_provider_credentials
-        mock_console.password.return_value = "sk-test123"
+        mock_password.return_value = "sk-test123"
         setup_provider_credentials("openai")
-        mock_secrets.store.assert_called_with("openai_api_key", "sk-test123")
+        mock_store.assert_called_with("openai_api_key", "sk-test123")
 
-    @patch("cli.commands.init.console")
-    @patch("cli.commands.init.secrets")
-    def test_setup_ollama_stores_url(self, mock_secrets, mock_console):
+    @patch("cli.core.console.text")
+    @patch("cli.core.secrets.store")
+    def test_setup_ollama_stores_url(self, mock_store, mock_text):
         from cli.commands.init import setup_provider_credentials
-        mock_console.text.return_value = "http://localhost:11434"
+        mock_text.return_value = "http://localhost:11434"
         setup_provider_credentials("ollama")
-        mock_secrets.store.assert_called_with(
+        mock_store.assert_called_with(
             "ollama_url", "http://localhost:11434"
         )
 
@@ -456,15 +465,73 @@ class TestRunCommand:
 
     @patch("cli.commands.run.DocumentationPipeline")
     @patch("cli.commands.run.inject_credentials")
-    def test_run_pipeline_calls_run(self, mock_inject, mock_pipeline_cls):
+    @patch("cli.commands.run.get_settings")
+    def test_run_pipeline_calls_run(self, mock_get_settings, mock_inject, mock_pipeline_cls):
         from cli.commands.run import run_pipeline
         mock_inject.return_value = {}
         mock_pipeline = MagicMock()
         mock_pipeline.run.return_value = {"status": "completed", "files": 3}
         mock_pipeline_cls.return_value = mock_pipeline
+        
+        mock_settings = MagicMock()
+        mock_settings.active_provider = "gemini"
+        mock_settings.rag.active_embedder = "gemini"
+        mock_settings.rag.embedding_model = "gemini-2.5-flash-lite"
+        mock_settings.rag.top_k_retriever = 2
+        mock_settings.rag.top_k_reranker = 2
+        mock_settings.rag.chunk_size = 500
+        mock_get_settings.return_value = mock_settings
+
         result = run_pipeline("https://github.com/example/repo.git")
         mock_pipeline.run.assert_called_once()
         assert result["status"] == "completed"
+
+    @patch("cli.commands.run.DocumentationPipeline")
+    @patch("cli.commands.run.inject_credentials")
+    @patch("cli.commands.run.get_settings")
+    @patch("cli.commands.run.console")
+    @patch("cli.commands.run.save_user_setting")
+    def test_run_pipeline_prompts_and_saves_missing_settings(
+        self, mock_save, mock_console, mock_get_settings, mock_inject, mock_pipeline_cls
+    ):
+        from cli.commands.run import run_pipeline
+        mock_inject.return_value = {}
+        mock_pipeline = MagicMock()
+        mock_pipeline.run.return_value = {"status": "completed", "files": 3}
+        mock_pipeline_cls.return_value = mock_pipeline
+
+        mock_s1 = MagicMock()
+        mock_s1.active_provider = None
+
+        mock_s2 = MagicMock()
+        mock_s2.active_provider = "gemini"
+        mock_s2.rag = None
+
+        mock_s3 = MagicMock()
+        mock_s3.active_provider = "gemini"
+        mock_s3.rag.active_embedder = "gemini"
+        mock_s3.rag.embedding_model = None
+
+        mock_s4 = MagicMock()
+        mock_s4.active_provider = "gemini"
+        mock_s4.rag.active_embedder = "gemini"
+        mock_s4.rag.embedding_model = "gemini-2.5-flash-lite"
+        mock_s4.rag.top_k_retriever = 2
+        mock_s4.rag.top_k_reranker = 2
+        mock_s4.rag.chunk_size = 500
+
+        mock_get_settings.side_effect = [mock_s1, mock_s2, mock_s3, mock_s4]
+
+        mock_console.select.side_effect = ["gemini", "gemini"]
+        mock_console.text.side_effect = ["gemini-2.5-flash-lite"]
+
+        result = run_pipeline("https://github.com/example/repo.git")
+        assert result["status"] == "completed"
+
+        # Assert save_user_setting was called for all three missing values
+        mock_save.assert_any_call("active_provider", "gemini")
+        mock_save.assert_any_call("rag.active_embedder", "gemini")
+        mock_save.assert_any_call("rag.embedding_model", "gemini-2.5-flash-lite")
 
 
 # ---------------------------------------------------------------------------

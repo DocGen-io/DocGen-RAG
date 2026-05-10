@@ -13,12 +13,19 @@ from rich.table import Table
 
 console = Console()
 
-def _check_abort(result):
-    """Exit cleanly if the user aborts a prompt (Ctrl+C)."""
-    if result is None:
-        print_warning("Operation cancelled by user.")
+from typing import Any
+
+def _ask_prompt(question_obj) -> Any:
+    """Safely execute a questionary prompt, handling Ctrl+C (KeyboardInterrupt / None)."""
+    try:
+        result = question_obj.ask()
+        if result is None:
+            print_warning("\nOperation cancelled by user.")
+            sys.exit(1)
+        return result
+    except KeyboardInterrupt:
+        print_warning("\nOperation cancelled by user.")
         sys.exit(1)
-    return result
 
 
 def print_header(text: str) -> None:
@@ -48,22 +55,22 @@ def print_warning(text: str) -> None:
 
 def confirm(message: str, default: bool = True) -> bool:
     """Ask for yes/no confirmation."""
-    return _check_abort(questionary.confirm(message, default=default).ask())
+    return _ask_prompt(questionary.confirm(message, default=default))
 
 
 def select(message: str, choices: list[str]) -> str:
     """Ask user to select from a list."""
-    return _check_abort(questionary.select(message, choices=choices).ask())
+    return _ask_prompt(questionary.select(message, choices=choices))
 
 
 def text(message: str, default: str = "") -> str:
     """Ask for free-form text input."""
-    return _check_abort(questionary.text(message, default=default).ask())
+    return _ask_prompt(questionary.text(message, default=default))
 
 
 def password(message: str) -> str:
     """Ask for sensitive input (masked)."""
-    return _check_abort(questionary.password(message).ask())
+    return _ask_prompt(questionary.password(message))
 
 
 def make_table(title: str, columns: list[str]) -> Table:
