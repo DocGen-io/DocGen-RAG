@@ -40,6 +40,15 @@ def run(
 ) -> None:
     """Generate documentation for a Git repository."""
     from cli.commands.run import run_pipeline, run_pipeline_background
+    from cli.core.console import confirm as cli_confirm, text as cli_text
+
+    # If --api-dir wasn't provided via CLI flag, offer interactive prompt
+    if api_dir is None:
+        if cli_confirm("Would you like to specify the API subdirectory path?", default=False):
+            api_dir = cli_text("Enter the API subdirectory path (relative to repo root):")
+            if not api_dir.strip():
+                api_dir = None
+
     if background:
         run_pipeline_background(git_url, api_dir=api_dir)
     else:
