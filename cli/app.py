@@ -3,12 +3,14 @@ DocGen CLI -- Professional command-line interface for DocGen-RAG.
 
 Usage:
   docgen init                        First-time setup
-  docgen run <git-url>               Generate documentation
+  docgen run                         Generate documentation (interactive)
+  docgen run <git-url>               Generate documentation for a git repo
   docgen config show|set|reset       Manage configuration
   docgen provider list|add|remove    Manage AI providers
   docgen credentials set|check|clear Manage stored credentials
 """
 
+import os
 from typing import Optional
 
 import typer
@@ -34,13 +36,45 @@ def init() -> None:
 
 @app.command()
 def run(
-    git_url: str = typer.Argument(..., help="Git repository URL to document."),
+    git_url: Optional[str] = typer.Argument(None, help="Git repository URL to document (optional)."),
     api_dir: Optional[str] = typer.Option(None, "--api-dir", help="Subdirectory containing the API."),
     background: bool = typer.Option(False, "--background", help="Run in a background process."),
 ) -> None:
-    """Generate documentation for a Git repository."""
+    """Generate documentation for a local project or a Git repository."""
     from cli.commands.run import run_pipeline, run_pipeline_background
-    from cli.core.console import confirm as cli_confirm, text as cli_text
+    from cli.core.console import (
+        confirm as cli_confirm,
+        text as cli_text,
+        select as cli_select,
+        print_step,
+        print_warning,
+        print_error,
+    )
+
+    # Determine source type
+    if git_url is not None:
+        # User passed a git URL directly as argument
+        source_type = "git"
+        path = git_url
+    else:
+        # Interactive: ask user to choose source type
+        source_type = cli_select(
+            "How would you like to provide the source code?",
+            choices=["local", "git"],
+        )
+
+        if source_type == "local":
+            cwd = os.getcwd()
+            print_step(f"Running documentation on the current directory: {cwd}")
+            print_warning(
+                "Make sure you are running docgen from the root of the project you want to document."
+            )
+            path = cwd
+        else:
+            path = cli_text("Enter the Git repository URL:")
+            if not path.strip():
+                print_error("A Git repository URL is required.")
+                raise SystemExit(1)
 
     # If --api-dir wasn't provided via CLI flag, offer interactive prompt
     if api_dir is None:
@@ -50,9 +84,9 @@ def run(
                 api_dir = None
 
     if background:
-        run_pipeline_background(git_url, api_dir=api_dir)
+        run_pipeline_background(path, source_type=source_type, api_dir=api_dir)
     else:
-        run_pipeline(git_url, api_dir=api_dir)
+        run_pipeline(path, source_type=source_type, api_dir=api_dir)
 
 
 @app.command()
