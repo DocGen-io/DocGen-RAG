@@ -2,8 +2,9 @@
 docgen run -- Execute the documentation pipeline.
 
 Usage:
-  docgen run <git-url>
-  docgen run <git-url> --background
+  docgen run                  Interactive mode (choose local or git)
+  docgen run <git-url>        Git mode (direct)
+  docgen run --background     Run in a background process
 """
 
 from dynaconf.base import Settings
@@ -115,11 +116,12 @@ def loop_missing_settings(e: MissingSettingError, settings: Settings) -> None:
 
 
 def run_pipeline(
-    git_url: str,
+    path: str,
+    source_type: str = "git",
     api_dir: str | None = None,
 ) -> dict[str, Any]:
     """
-    Run the documentation pipeline on a git repository.
+    Run the documentation pipeline on a local project or git repository.
 
     Loads credentials from keyring, writes a config.yaml compatible with
     the existing pipeline, and executes it.
@@ -145,11 +147,11 @@ def run_pipeline(
     with open(config_path, "w") as f:
         yaml.dump(config_dict, f, default_flow_style=False)
 
-    console.print_step(f"Generating documentation for: {git_url}")
+    console.print_step(f"Generating documentation for: {path}")
 
     PipelineClass = DocumentationPipeline or _get_pipeline_class()
     pipeline = PipelineClass(config_path=str(config_path))
-    result = pipeline.run(source_type="git", path=git_url, api_dir=api_dir)
+    result = pipeline.run(source_type=source_type, path=path, api_dir=api_dir)
 
     status = result.get("status", "unknown")
     if status == "completed":
@@ -181,12 +183,12 @@ def run_pipeline(
     return result
 
 
-def run_pipeline_background(git_url: str, api_dir: str | None = None) -> None:
+def run_pipeline_background(path: str, source_type: str = "git", api_dir: str | None = None) -> None:
     """Run the pipeline in a background process (cross-platform)."""
     process = multiprocessing.Process(
         target=run_pipeline,
-        args=(git_url,),
-        kwargs={"api_dir": api_dir},
+        args=(path,),
+        kwargs={"source_type": source_type, "api_dir": api_dir},
         daemon=True,
     )
     process.start()

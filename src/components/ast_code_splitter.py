@@ -35,6 +35,7 @@ class ASTCodeSplitter:
     """
 
     def __init__(self,config_path: str = "config.yaml"):
+        self.config_path = config_path
         self.config = load_config(config_path)
 
     @component.output_types(documents=List[Document])
@@ -67,7 +68,7 @@ class ASTCodeSplitter:
                 continue
 
             try:
-                extractor = GeneralExtractor(language)
+                extractor = GeneralExtractor(language, self.config_path)
                 records: List[ASTOutputRecord] = extractor.extract(file_path, file_meta)
                 all_records.extend(records)
 
