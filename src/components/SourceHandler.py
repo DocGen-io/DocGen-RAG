@@ -84,9 +84,13 @@ class SourceHandler:
         # Using pathlib to cleanly navigate up 3 directories from the current file
         project_root = Path(__file__).resolve().parents[2]
         local_ignore_path = project_root / ".llmignore"
-        target_ignore_path = Path(working_dir) / ".llmignore"
+        target_dir = Path(working_dir)
+        target_ignore_path = target_dir / ".llmignore"
 
-        if local_ignore_path.exists() and Path(working_dir) != local_ignore_path.parent:
+        if not target_dir.exists():
+            return
+
+        if local_ignore_path.exists() and target_dir != local_ignore_path.parent:
             shutil.copy2(local_ignore_path, target_ignore_path)
             logger.info(f"Copied .llmignore from {local_ignore_path} to {working_dir}")
     
@@ -108,14 +112,37 @@ class SourceHandler:
             raise RuntimeError(f"Failed to clone repository: {e}")
     
     def _copy_local(self, folder_path: str) -> str:
-        """Copy local folder to temp directory."""
+        """Copy local folder to temp directory, skipping paths matched by .llmignore."""
         if not os.path.exists(folder_path):
             raise FileNotFoundError(f"Local folder not found: {folder_path}")
         
         self.temp_dir = tempfile.mkdtemp(prefix="docgen_local_")
+
+        # Apply the project's .llmignore rules during the copy so large
+        # directories like node_modules are never touched.
+        self._apply_local_llmignore(folder_path)
+        is_ignored = get_llm_ignore_filter(folder_path)
+
+        def _ignore(directory: str, entries: list[str]) -> set[str]:
+            ignored = set()
+            for entry in entries:
+                full = os.path.join(directory, entry)
+                # gitignore_parser needs trailing slash for directory rules
+                if os.path.isdir(full):
+                    full += os.sep
+                if is_ignored(full):
+                    ignored.add(entry)
+            return ignored
+
+        logger.info(f"Copying local folder {folder_path} to temp directory (applying .llmignore rules)...")
         
         try:
-            shutil.copytree(folder_path, self.temp_dir, dirs_exist_ok=True)
+            shutil.copytree(
+                folder_path,
+                self.temp_dir,
+                dirs_exist_ok=True,
+                ignore=_ignore,
+            )
             return self.temp_dir
         except Exception as e:
             self.cleanup()
