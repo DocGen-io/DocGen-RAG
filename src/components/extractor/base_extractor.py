@@ -25,6 +25,14 @@ class BaseASTExtractor:
         full_config = load_config(config_path)
         self.config = full_config["ast_extractor"]
         self.config["queries"] = full_config.get("queries", {})
+
+        # Resolve relative query paths against the config file's directory
+        # so extractors work regardless of the user's CWD.
+        config_dir = os.path.dirname(os.path.abspath(config_path))
+        for key, path in self.config["queries"].items():
+            if path and not os.path.isabs(path):
+                self.config["queries"][key] = os.path.join(config_dir, path)
+
         self.logger = DocGenLogger(self.__class__.__name__)
         self.language = self._load_language()
         self.parser = Parser(self.language) if self.language else None

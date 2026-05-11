@@ -109,6 +109,7 @@ class ControllerExtractor:
     """Haystack component: routes files to _ControllerQueryExtractor by language."""
 
     def __init__(self, config_path: str = "config.yaml"):
+        self.config_path = config_path
         self.config = load_config(config_path)
         self.supported_languages = self.config.get("languages", [])
         if not self.supported_languages:
@@ -136,7 +137,7 @@ class ControllerExtractor:
                 continue
             try:
                 if language not in extractors:
-                    extractors[language] = _ControllerQueryExtractor(language)
+                    extractors[language] = _ControllerQueryExtractor(language, self.config_path)
                 endpoints = extractors[language].extract(file_path, file_metadata)
                 if endpoints:
                     all_endpoints.extend(endpoints)

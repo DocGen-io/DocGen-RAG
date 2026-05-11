@@ -18,8 +18,8 @@ class GeneralExtractor(BaseASTExtractor):
     CONTAINER_TAGS = ["class_name", "interface_name", "record_name"]
     METHOD_TAGS = ["method_name", "method_call"]
 
-    def __init__(self, language_name: str):
-        super().__init__(language_name)
+    def __init__(self, language_name: str, config_path: str = "config.yaml"):
+        super().__init__(language_name, config_path)
         self.query_path = os.path.join(self.config["queries"]["general"], f"{language_name}.scm")
 
     @staticmethod
