@@ -7,6 +7,7 @@ text extraction, and the final flattening into ASTOutputRecord.
 import re
 import os
 import json
+from pathlib import Path
 
 from tree_sitter_language_pack import get_language
 from tree_sitter import Language, Parser, Tree, Query
@@ -26,12 +27,13 @@ class BaseASTExtractor:
         self.config = full_config["ast_extractor"]
         self.config["queries"] = full_config.get("queries", {})
 
-        # Resolve relative query paths against the config file's directory
-        # so extractors work regardless of the user's CWD.
-        config_dir = os.path.dirname(os.path.abspath(config_path))
+        # Resolve relative query paths against the project root (not config dir,
+        # since dynamic configs may live in /tmp). Project root is derived from
+        # this file's location: src/components/extractor/ → 3 levels up.
+        project_root = str(Path(__file__).resolve().parents[3])
         for key, path in self.config["queries"].items():
             if path and not os.path.isabs(path):
-                self.config["queries"][key] = os.path.join(config_dir, path)
+                self.config["queries"][key] = os.path.join(project_root, path)
 
         self.logger = DocGenLogger(self.__class__.__name__)
         self.language = self._load_language()
