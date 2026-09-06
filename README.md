@@ -1,216 +1,78 @@
 # DocGen-RAG
 
-DocGen-RAG is an AI-powered tool designed to automatically generate comprehensive API documentation from source code using Retrieval-Augmented Generation (RAG). It leverages Haystack 2.0 and Weaviate to analyze codebases and produce structured documentation including Swagger specs collections, and usage examples.
+M.Sc. thesis component: Haystack 2.0 pipelines, Tree-sitter extractors, CLI, and evaluation.
 
-## Features
+Turns NestJS / Spring Boot / ASP.NET REST source into OpenAPI 3.0 fragments, then a RAG pipeline retrieves code context and a merger builds a spec.
 
-- **Automated Documentation**: Generates REST API documentation from code.
-- **RAG Pipeline**: Uses knowledge injection from framework documentation and codebase indexing.
-- **Multi-Source Support**: Processes both local directories and Git repositories.
-- **Output Formats**: Generates Swagger/OpenAPI JSON Collections, and usage examples.
-- **Project Management**: Managed with `uv` for fast, reliable dependency management.
+HTTP console is **[DocGen-API](https://github.com/DocGen-io/DocGen-API)** + **[DocGen-UI](https://github.com/DocGen-io/DocGen-UI)**. This repo is not a public HTTP API and not a hosted product.
 
-## Prerequisites
+Org: [github.com/DocGen-io](https://github.com/DocGen-io) · site: [ali-hasan.me/projects/docgen](https://ali-hasan.me/projects/docgen)
 
-- **Python**: 3.8+
-- **Weaviate**: A running Weaviate instance (local or cloud).
-- **OpenAI API Key**: (Optional) For generation capabilities if using OpenAI models.
+## What this is / is not
 
-## Installation
+**Is**
 
-1.  **Clone the repository**:
-    ```bash
-    git clone https://github.com/your-repo/DocGen-RAG.git
-    cd DocGen-RAG
-    ```
+- CLI + Haystack 2.0 pipelines + Weaviate index
+- Tree-sitter `.scm` extractors for **TypeScript, Java, and C#** only (`queries/`)
+- Evaluation on 8 RealWorld / Conduit-style repos
 
-2.  **Create and activate a virtual environment**:
-    ```bash
-    python -m venv rag_venv
-    source rag_venv/bin/activate  # On Windows: rag_venv\Scripts\activate
-    ```
+**Is not**
 
-3.  **Install dependencies**:
-    ```bash
-    pip install . --use-feature=in-tree-build
-    ```
+- Extractors for Python, Go, or PHP
+- A public multi-tenant SaaS or a production URL
+- Native Weaviate hybrid search (retrieval concatenates dense + BM25)
+- SAST / security scanning
+- Graph-aware incremental rebuilds (unchanged files are skipped by **file hash** only)
 
-## Interactive CLI
+Paid work on the CV is NestJS / Next.js / PostgreSQL. DocGen is the thesis product.
 
-We now provide an interactive CLI tool (`docgen`) to automatically generate documentation for any provided git repository. It handles dependencies and Weaviate startup in the background.
+## Run
 
-To install it globally to your system PATH, safely run the install script from the repository root:
+Python 3.10+. Live config is **`config.yaml`**, not `settings.yml`.
+
 ```bash
-chmod +x install.sh
-./install.sh
+git clone https://github.com/DocGen-io/DocGen-RAG.git
+cd DocGen-RAG
+uv sync --extra cli
+uv run docgen
+uv run pytest tests/ -q
 ```
 
-You can now trigger the prompt anywhere simply by typing:
+Needs a Weaviate URL (compose in the API repo, or your own). LLM keys as in `config.yaml` (Gemini / Ollama / OpenAI).
+
+There is no `src.api.main` in this package.
+
+## Evaluation
+
 ```bash
-docgen
+uv run python evaluation/evaluate.py
 ```
 
-## Configuration
+Suffix match vs ground truth. Completeness can exceed 1. σ(method F1) ≈ 0.23. Express + Drizzle path extraction is weak. Do not quote 90–100% precision.
 
-Configuration is managed via `settings.yml` and environment variables.
+| Model | Method F1 | Path F1 | Time (s) | Valid OpenAPI | Completeness |
+|-------|-----------|---------|----------|---------------|--------------|
+| gemini-2.5-flash-lite | 0.818 | 0.836 | 110 | 88% | 1.09 |
+| gemini-2.5-pro | 0.821 | 0.846 | 862 | 88% | 1.09 |
+| gemini-2.5-flash | 0.755 | 0.792 | 415 | 100% | 0.96 |
 
-### `settings.yml`
-Adjust RAG pipeline settings such as retrieval thresholds and model choices:
-```yaml
-rag:
-  embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
-  top_k_retriever: 10
-  top_k_reranker: 5
-  chunk_size: 50
+Lite vs Pro ≈ **7.8×** faster at similar method F1.
+
+## Layout
+
+```
+cli/           uv run docgen
+src/           Haystack components and pipelines
+queries/       Tree-sitter .scm (TS, Java, C#)
+evaluation/    ground truths + evaluate.py
+prompts/       LLM prompts
+config.yaml    live provider config
 ```
 
-### Environment Variables
-Set the following environment variables (e.g., in a `.env` file or export them):
+## Related
 
-- `WEAVIATE_URL`: URL to your Weaviate instance.
-- `WEAVIATE_API_KEY`: (If authentication is enabled).
-- `OPENAI_API_KEY`: Required for the generator component if using OpenAI.
+- [DocGen-API](https://github.com/DocGen-io/DocGen-API) — FastAPI + **Celery** worker
+- [DocGen-UI](https://github.com/DocGen-io/DocGen-UI)
+- [DocGen-Action](https://github.com/DocGen-io/DocGen-Action) — needs a **persistent** Weaviate URL
 
-## Usage
-
-1.  **Start the Server**:
-    ```bash
-    uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
-    ```
-
-2.  **Trigger Generation**:
-    Send a `POST` request to `/generate`:
-
-    **Endpoint**: `http://localhost:8000/generate`
-
-    **Body (Local)**:
-    ```json
-    {
-        "source_type": "local",
-        "path": "/absolute/path/to/project"
-    }
-    ```
-
-    **Body (Git)**:
-    ```json
-    {
-        "source_type": "git",
-        "path": "https://github.com/username/repo.git",
-        "credentials": "optional_token"
-    }
-    ```
-
-3.  **Check Output**:
-    Documentation artifacts will be generated in `output/<timestamp>/`.
-
-## Project Structure
-
-- `src/api`: FastAPI application entry point.
-- `src/core`: Configuration and security settings.
-- `src/pipelines`: Haystack RAG pipelines for indexing and generation.
-- `src/services`: Core logic for input handling, framework detection, and document generation.
-- `settings.yml`: Configuration file.
-
-## Current RAG System Chart
-```mermaid
-graph TD
-
-    %% Compare
-    HE{"Hash Exists!"}
-    
-    %% Stop
-    SFF{{"Stop for this file!"}}
-    
-    %% Notes
-
-
-
-  %% Input Sources
-    subgraph IngestionPipeline ["Ingestion Pipeline"]
-        Input1(["Local Codebase Folder"])
-        Input2(["GitHub Repo URL"])
-        SH["Source Handler"]
-        FH("File Hasher")
-        SQLH[("SQLLite Table for saving Hashes")]
-
-    end
-
-    %% Abstract Syntax Tree Components
-    subgraph ASTComponents ["Abstract Syntax Trees Based Componenet (Serial)"]
-        CE("Controllers Extractor")
-        CS("General AST CodeSplitter")
-    end
-
-    subgraph AnalysisPipeline ["Analysis/Chunking Pipeline (Parallel)"]
-        ASTComponents
-        FA["File Analyzer"]
-        DS[("Centralized Weaviate **Code** Storage")]
-
-        
-    end
-    
-    %% --- HERE IS THE NEW SUBGRAPH ---
-    subgraph DocPipeline ["Documentation Pipeline"]
-        EGM["Endpoint Graph Manager"]
-        SQLG[("SQLLite for saving Graphs")]
-
-        EGR["Endpoint Documentation Generator"]
-        DM["Documentation Merger"]
-        DSV[("Centralized Weaviate **Docs Vectorized** Storage")]
-
-    end
-    %% --------------------------------
-
-    Output("Documentation as Json Output")
-
-    %% ==========================================
-    %% 1. PRIMARY DOWNWARD FLOW 
-    %% ==========================================
-    Input1 --> SH
-    Input2 --> SH
-    SH --> FH
-    CE --> CS
-    FH -- Compare with Key/Value Store --> SQLH
-    IngestionPipeline -- Read From Hashes Table --> HE
-    HE -- NO --> AnalysisPipeline
-    AnalysisPipeline -- Update Graph and Indicate changes for each endpoint --> EGM
-    EGM --> EGR
-    EGR --> DM
-    DM --> Output
-
-    %% ==========================================
-    %% 2. SIDE BRANCHES
-    %% ==========================================
-    HE -- Yes --> SFF
-    FA -- Save Code chunks --> DS
-    ASTComponents -- Save Code chunks --> DS
-
-
-
-    DSV --> EGR
-
-    %% ==========================================
-    %% 3. LOOPBACKS (Extended Links)
-    %% ==========================================
-    EGR -- Save documentation info (vectorized) ---> DSV
-    EGM -- Save Graphs ---> SQLG
-    
-    %% ==========================================
-    %% STYLES
-    %% ==========================================
-    style Input1 fill:#2c3e50,stroke:#5dade2,stroke-width:2px,color:#fff
-    style Input2 fill:#2c3e50,stroke:#5dade2,stroke-width:2px,color:#fff
-    style SH     fill:#34495e,stroke:#5dade2,stroke-width:1px,color:#fff
-    style FA     fill:#2d5a27,stroke:#a9dfbf,stroke-width:1px,color:#fff
-    style HE     fill:#7d6608,stroke:#f1c40f,stroke-width:2px,color:#fff
-    style FH     fill:#4a235a,stroke:#a569bd,stroke-width:1px,color:#fff
-    style EGM    fill:#4a235a,stroke:#a569bd,stroke-width:1px,color:#fff
-    style EGR    fill:#4a235a,stroke:#a569bd,stroke-width:1px,color:#fff
-    style DM     fill:#4a235a,stroke:#a569bd,stroke-width:1px,color:#fff
-    style DSV     fill:#1b2631,stroke:#5dade2,stroke-width:2px,color:#fff
-    style DS     fill:#1b2631,stroke:#5dade2,stroke-width:2px,color:#fff
-    style SFF    fill:#641e16,stroke:#ec7063,stroke-width:2px,color:#fff
-    style Output fill:#0e6251,stroke:#1abc9c,stroke-width:2px,color:#fff
-    %% Style for the Subgraph itself
-    style DocPipeline fill:#17202a,stroke:#7f8c8d,stroke-width:2px,stroke-dasharray: 5 5,color:#fff
-```
+Ali Saleem Hasan — [ali-hasan.me](https://ali-hasan.me)
